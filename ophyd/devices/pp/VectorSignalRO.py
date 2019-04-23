@@ -1,8 +1,10 @@
 import time
 import numpy as np
+import copy
 
 from ophyd import EpicsSignalRO
 
+_copy = copy.copy
 class VectorSignalRO( EpicsSignalRO ):
     """
     Converts numpy array to pickle strings
@@ -18,7 +20,7 @@ class VectorSignalRO( EpicsSignalRO ):
         super().__init__(*args, **kws)
         self._t0 = time.time()
 
-    def read(self, *args, **kws):
+    def read2(self, *args, **kws):
         """Convert a vector array to a pickle dump
 
         Will handle nearly any array. Implemented in

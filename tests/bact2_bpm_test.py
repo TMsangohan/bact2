@@ -7,7 +7,8 @@ from cycler import cycler
 import bluesky.callbacks.best_effort
 
 # update these directories to where you cloned the packages or install them
-sys.path.append('/home/tmerten/github-repos/')
+# sys.path.append('/home/tmerten/github-repos/')
+sys.path.append('/net/nfs/srv/MachinePhysics/MachineDevelopment/Mertens/github-repos/')
 
 from bluesky.utils import install_qt_kicker
 import bluesky.callbacks as bc
@@ -19,14 +20,14 @@ import databroker
 
 from ophyd import sim
 
-from bact2.ophyd.devices.raw.BPMWaveformDetector import BPMWaveformDetector
+from bact2.ophyd.devices.raw.BPMWaveformDetector import BPMStorageRing
 from bact2.ophyd.utils.preprocessors.CounterSink import CounterSink
 
 
 def main():
 	print(time.time())
 	# Repeat the measurement 5 times
-	n_meas = 1
+	n_meas = 2
 
 	# The frequency range
 	f0 = 10
@@ -35,14 +36,16 @@ def main():
 
 
 
-	bpm = BPMWaveformDetector(name = "bpm")
+	# bpm = BPMWaveformDetector(name = "bpm")
+	bpm = BPMStorageRing(name = "bpm")
 	cs = CounterSink(name = "count_bpm_reads", delay = .0)
 
-	cs.inform_set_done = bpm.new_trigger
+	cs.inform_set_done = bpm.waveform.new_trigger
 	repeat = cycler(cs, range(n_meas))
 
 	sw_freq = cycler(sim.motor, freq)
 
+        
 	if not bpm.connected:
 	    bpm.wait_for_connection()
 
@@ -55,17 +58,17 @@ def main():
 	RE.subscribe(bec)
 	install_qt_kicker()
 
-	# RE.waiting_hook = ProgressBarManager()
+	RE.waiting_hook = ProgressBarManager()
 
-	db = databroker.Broker.named('temp')
-	RE.subscribe(db.insert)
+	#db = databroker.Broker.named('temp')
+	#RE.subscribe(db.insert)
 
 	uids = RE(bp.scan_nd(det, sw_freq * repeat))
 	print(uids)
 
-	headers = db[uids]
-	header = headers[0]
-	print(header)
+	#headers = db[uids]
+	#header = headers[0]
+	#print(header)
 
 
 if __name__ == '__main__':
