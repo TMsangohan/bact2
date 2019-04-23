@@ -14,4 +14,5 @@ Tom Mertens:
             * databroker
     - created HISTORY.md file
     - added .gitignore file
+    - added __init__.py files
     - 
