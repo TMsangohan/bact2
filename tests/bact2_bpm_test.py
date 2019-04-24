@@ -7,8 +7,8 @@ from cycler import cycler
 import bluesky.callbacks.best_effort
 
 # update these directories to where you cloned the packages or install them
-# sys.path.append('/home/tmerten/github-repos/')
-sys.path.append('/net/nfs/srv/MachinePhysics/MachineDevelopment/Mertens/github-repos/')
+sys.path.append('/home/tmerten/github-repos/')
+# sys.path.append('/net/nfs/srv/MachinePhysics/MachineDevelopment/Mertens/github-repos/')
 
 from bluesky.utils import install_qt_kicker
 import bluesky.callbacks as bc
@@ -27,7 +27,7 @@ from bact2.ophyd.utils.preprocessors.CounterSink import CounterSink
 def main():
 	print(time.time())
 	# Repeat the measurement 5 times
-	n_meas = 2
+	n_meas = 5
 
 	# The frequency range
 	f0 = 10
@@ -56,20 +56,25 @@ def main():
 	RE = RunEngine({})
 	RE.log.setLevel("INFO")
 	RE.subscribe(bec)
-	install_qt_kicker()
+	# install_qt_kicker()
 
-	RE.waiting_hook = ProgressBarManager()
+	# RE.waiting_hook = ProgressBarManager()
 
-	#db = databroker.Broker.named('temp')
-	#RE.subscribe(db.insert)
+	db = databroker.Broker.named('temp')
+	db = databroker.Broker.named('mongo')
+	RE.subscribe(db.insert)
 
 	uids = RE(bp.scan_nd(det, sw_freq * repeat))
 	print(uids)
 
-	#headers = db[uids]
-	#header = headers[0]
-	#print(header)
+	headers = db[uids]
+	header = headers[0]
+	print(header)
 
+	header = db[-1]
+	df = header.table()
+
+	print(df.columns)
 
 if __name__ == '__main__':
 	main()

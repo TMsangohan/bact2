@@ -1,12 +1,13 @@
 from ophyd import Component as Cpt, EpicsSignalRO
 from ophyd import Device
-
+import sys
+sys.path.append('/home/tmerten/github-repos/')
 from bact2.ophyd.devices.pp.VectorSignalRO import VectorSignalRO
-from bact2.ophyd.utils.preprocessors.EnsureNewValueWhenTriggered import EnsureNewValueWhenTriggered
+from bact2.ophyd.devices.utils.EnsureNewValueWhenTriggered import EnsureNewValueWhenTriggered
 
 class BPMDetectorStatistics( Device ):
     """
-
+    
     Warning:
        Untested code! 
     """
@@ -34,8 +35,7 @@ class BPMWaveformDetector( Device ):
 
 
 class BPMStorageRing( Device ):
-    stat = Cpt(BPMDetectorStatistics, "BPMZR", name = "stat", # egu = "mm"
-    )
+    stat = Cpt(BPMDetectorStatistics, "BPMZR", name = "stat")
     waveform = Cpt(BPMWaveformDetector, "MDIZ2T5G", name = "wavefrom")
 
     def trigger(self, *args, **kwargs):
