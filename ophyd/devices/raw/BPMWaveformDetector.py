@@ -1,15 +1,14 @@
 from ophyd import Component as Cpt, EpicsSignalRO
 from ophyd import Device
-import sys
-sys.path.append('/home/tmerten/github-repos/')
+
 from bact2.ophyd.devices.pp.VectorSignalRO import VectorSignalRO
 from bact2.ophyd.devices.utils.EnsureNewValueWhenTriggered import EnsureNewValueWhenTriggered
 
 class BPMDetectorStatistics( Device ):
     """
-    
+
     Warning:
-       Untested code! 
+       Untested code!
     """
     mean_x = Cpt(EpicsSignalRO, ":avgV")
     mean_y = Cpt(EpicsSignalRO, ":avgH")
@@ -20,12 +19,13 @@ class BPMWaveformDetector( Device ):
     """
     Ensures that always a new value will be read
     """
+    #: packed data containing different values
     waveform = Cpt(VectorSignalRO , ":bdata")
     #: counter: the last reading?
     counter  = Cpt(EpicsSignalRO,   ":count")
     #: data ready to take?
     ready    = Cpt(EpicsSignalRO,  ":ready")
-    
+
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.new_trigger = EnsureNewValueWhenTriggered(minimum_delay = 10e-3, timeout = 3.0)
