@@ -44,16 +44,16 @@ class BPMWaveform(  bpm_raw.BPMPackedData ):
 
 
     #: Relative horizontal beam offset as measured by the beam position monitors
-    pos_x       = Cpt(Signal,  name = "dx")
+    pos_x       = Cpt(Signal, name = "dx")
     #: Relative vertical beam offset as measured by the beam position monitors
-    pos_y       = Cpt(Signal,  name = "dy")
+    pos_y       = Cpt(Signal, name = "dy")
     #:
-    intensity_z = Cpt(Signal,  name = "z")
-    intensity_s = Cpt(Signal,  name = "s")
-    status      = Cpt(Signal,  name = "status")
+    intensity_z = Cpt(Signal, name = "z")
+    intensity_s = Cpt(Signal, name = "s")
+    status      = Cpt(Signal, name = "status")
     gain        = Cpt(Signal, name = "gain")
-    rms_x       = Cpt(Signal, name = "gain")
-    rms_y       = Cpt(Signal, name = "gain")
+    rms_x       = Cpt(Signal, name = "rms_x")
+    rms_y       = Cpt(Signal, name = "rms_y")
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
