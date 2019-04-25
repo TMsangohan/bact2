@@ -57,7 +57,7 @@ def main():
 	RE.log.setLevel("INFO")
 	RE.subscribe(bec)
 	# install_qt_kicker()
-
+ 
 	# RE.waiting_hook = ProgressBarManager()
 
 	db = databroker.Broker.named('temp')
