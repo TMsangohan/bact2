@@ -9,9 +9,17 @@ from bluesky.utils import install_qt_kicker
 
 from ophyd import sim
 
+import sys 
+sys.path.append('/home/tmerten/github-repos/')
+# sys.path.append('/net/nfs/srv/MachinePhysics/MachineDevelopment/Mertens/github-repos/')
+sys.path.append('/home/tmerten/gitlab-repos-hzb/suitcase-elasticsearch/')
+
+from suitcase.elasticsearch import Serializer
+
 from bact2.ophyd.utils.preprocessors.CounterSink import CounterSink
 from bact2.ophyd.devices.pp.bpm import BPMStorageRing
 import numpy as np
+
 
 
 def main():
@@ -46,6 +54,8 @@ def main():
 	install_qt_kicker()
 	RE.waiting_hook = ProgressBarManager()
 
+	serializer = Serializer('localhost',9200)
+	RE.subscribe(serializer)
 
 	RE(bp.scan_nd(det, sw_freq * repeat))
 
