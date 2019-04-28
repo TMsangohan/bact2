@@ -5,10 +5,12 @@ A higher level of access is provided by
 """
 from ophyd import Component as Cpt, EpicsSignalRO
 from ophyd import Device
+from ophyd.status import Status
 
-from bact2.ophyd.devices.pp.VectorSignalRO import VectorSignalRO
-from bact2.ophyd.devices.utils.EnsureNewValueWhenTriggered import EnsureNewValueWhenTriggered
+from ..pp.VectorSignalRO import VectorSignalRO
+from ..utils.EnsureNewValueWhenTriggered import EnsureNewValueWhenTriggered
 
+from ..utils import signal_with_validation
 class BPMStatistics( Device ):
     """Average statistics of the beam position monitor
 
@@ -20,6 +22,7 @@ class BPMStatistics( Device ):
     rms_x  = Cpt(EpicsSignalRO, ":rmsV")
     rms_y  = Cpt(EpicsSignalRO, ":rmsH")
 
+
 class BPMPackedData( Device ):
     """Common readings of all Beam position monitor data
 
@@ -29,7 +32,7 @@ class BPMPackedData( Device ):
     Ensures that always a new value will be read
     """
     #: packed data containing different values
-    packed_data = Cpt(VectorSignalRO , ":bdata")
+    packed_data = Cpt(EpicsSignalRO , ":bdata")
     #: counter: the last reading?
     counter  = Cpt(EpicsSignalRO,   ":count")
     #: data ready to take?
@@ -38,6 +41,13 @@ class BPMPackedData( Device ):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.new_trigger = EnsureNewValueWhenTriggered(minimum_delay = 10e-3, timeout = 3.0)
+        #self.validated_data = signal_with_validation.FlickerSignal(self.packed_data)
 
     def trigger(self):
         return self.new_trigger.trigger_check(self.packed_data)
+        #return self.validated_data.trigger_and_validate()
+ 
+    def read(self, *args, **kwargs):
+        r = super().read(*args, **kwargs)
+        #self.validated_data.data_read()
+        return r
