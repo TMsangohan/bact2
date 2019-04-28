@@ -67,9 +67,9 @@ def unpack_vector_to_matrix(vec, n_vecs = None):
 
     if remainder != 0:
         msg = "Vector with shape {} can not be split to {} # vectors: remainder {} (vec {})"
-        logger.error(msg.format(shape, n_vecs, remainder, vec))
+        logger.error(msg.format(vec.shape, n_vecs, remainder, vec))
         msg = "Vector with shape {} can not be split to {} # vectors: remainder {}"
-        raise Bact2AssertionError(msg.format(shape, n_vecs, remainder))
+        raise Bact2AssertionError(msg.format(vec.shape, n_vecs, remainder))
 
     n_elements = l // n_vecs
     n_shape = [n_vecs, n_elements]
