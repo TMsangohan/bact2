@@ -3,9 +3,18 @@ import time
 
 
 class BPMMeasurementStates:
+    """Follow the state of the BPM readings
 
+    User is expected to call:
+         * :meth:`set_triggered` to inform that measurement should
+           start
+        *  :meth:`set_idle` to inform that measurement acquisiton
+           can restart (typically it means data were taken)
+
+    measurement states are defined in
+    :class:`measurement_state_machine.AcquisitionState`
+    """
     def __init__(self, *args, parent = None, **kwargs):
-        #super().__init__(self, *args, **kwargs)
         assert(parent is not None)
         self._timestamp = None
         self._counter = None
@@ -38,6 +47,10 @@ class BPMMeasurementStates:
 
     @property
     def dt(self):
+        """Time since triggered
+
+        Used for logging as user information
+        """
         if self._timestamp is None:
             return -1.0
 
@@ -58,6 +71,8 @@ class BPMMeasurementStates:
                 raise AssertionError(fmt.format(self._counter, val))
 
     def set_idle(self):
+        """Typically: we are done ..
+        """
         self.measurement_state.set_idle()
         self._timestamp = None
         self._counter = None
@@ -79,6 +94,11 @@ class BPMMeasurementStates:
 
 
     def set_acquire(self):
+        """
+
+        When BPM signals that status is finished set the state
+        engine to finished to
+        """
         self.measurement_state.set_acquire()
 
         bpm_status = self.parent.bpm_status
@@ -86,6 +106,8 @@ class BPMMeasurementStates:
 
     def set_finished(self):
         """
+
+        Remove the callbacks to the changed values
         """
         self.log("Finished acquistion dt = {:.2f}".format(self.dt))
         for signal in (self.parent.counter, self.parent.ready, self.parent.packed_data):
@@ -109,21 +131,35 @@ class BPMMeasurementStates:
         return r
 
     def onValueChangeIdle(self, *args, **kwargs):
+        """
+
+        Todo:
+            Review if exception to be raised if called
+        """
         self.log("on value idle args {} kwargs {}".format(args, kwargs))
 
     def onValueChangeTriggered(self, *args, name = None, **kwargs):
+        """Start acquiring when ready signals low value
+
+        Todo:
+           Check if ready == 0 means that acquisition started
+        """
         #self.log("on value triggered args {} kwargs {}".format(args, kwargs))
 
         self.log("Triggered by name {}".format(name))
         if name == "bpm_waveform_ready":
             ready = kwargs["value"]
-
-            self.log("Triggered ready val = {}".format(ready))
+            txt = "Triggered ready val = {}".format(ready)
+            self.log(txt)
             if not ready:
                 # Waiting for the data!
                 self.set_acquire()
 
     def onValueChangeAcquire(self, *args, name = None, **kwargs):
+        """Acquire data as long as ready is low
+
+        If ready returns to high switch to validate
+        """
         #self.log("on value acquire args {} kwargs {}".format(args, kwargs))
         self.log("on value acquire dt {:.2f} name {}".format(self.dt, name))
         if name == "bpm_waveform_ready":
@@ -138,11 +174,18 @@ class BPMMeasurementStates:
 
         elif name == "bpm_waveform_packed_data":
             self.log("Acquire dt {:.2f} got bdata".format(self.dt))
-
         else:
             raise AssertionError("name {} unknown".format(name))
 
     def onValueChangeValidate(self, *args, name = None, **kwargs):
+        """Accept the last packed data arriving during validation time
+
+        Assumes that packed_data are sent out after ready goes back
+        to high
+
+        Todo:
+            Review if a check should be made if ready falls off to low
+        """
         # self.log("on value validate args {} kwargs {}".format(args, kwargs))
         self.log("on value validate dt {:.2f} name {}".format(self.dt, name))
         if name == "bpm_waveform_ready":
@@ -163,9 +206,16 @@ class BPMMeasurementStates:
         pass
 
     def onValueChangeFinished(self, *args, **kwargs):
+        """
+        Todo:
+            Review if exception should be raised if called
+        """
         self.log("on value finished args {} kwargs {}".format(args, kwargs))
-        pass
 
     def onValueChangeFailed(self, *args, **kwargs):
+        """
+
+        Todo:
+            Review if exception should be raised if called
+        """
         self.log("on value failed args {} kwargs {}".format(args, kwargs))
-        pass
