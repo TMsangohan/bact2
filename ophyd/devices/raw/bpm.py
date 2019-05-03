@@ -31,6 +31,9 @@ class BPMPackedData( Device ):
     A higher level of access is provided by
     :class:`bact2.ophyd.bact2.ophyd.devices.pp.bpm.BPMWaveform`
     Ensures that always a new value will be read
+
+    Check of bpm state and data reading is done in
+    :class:`BPMMeasurementStates`
     """
     #: packed data containing different values
     packed_data = Cpt(EpicsSignalRO , ":bdata")
@@ -42,32 +45,25 @@ class BPMPackedData( Device ):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.validated_data = signal_with_validation.FlickerSignal(self.packed_data)
-        # self.measurement_state = measurement_state_machine.AcquisitionState()
         self.measurement_state = BPMMeasurementStates(parent = self)
-        self.bpm_status = None
-        self.save_counter = None
-
+        self.bpm_timeout = 3.0
 
     def trigger(self):
-        #return self.new_trigger.trigger_check(self.packed_data)
-
-        self.save_counter = None
-        max_tries = 20
-
-        bpm_timeout = 3.
+        """Inform the measurement state engine that measurement starts
+        """
         self.bpm_status = None
-        self.bpm_status   = DeviceStatus(device=self.packed_data, timeout = bpm_timeout)
+        self.bpm_status = DeviceStatus(device=self.packed_data,
+                                           timeout = self.bpm_timeout)
+        # Inform the measurement state engine that data acquistion
+        # starts
         self.measurement_state.set_triggered()
-
-        # self.counter.subscribe()
-        # self.ready.subscribe(self.measurement_state.onValueChange)
-        # self.packed_data.subscribe(self.measurement_state.onValueChange)
-        # bpm_status.add_callback(self.measurement_state.onValueChange)
 
         # print("bpm trigger finished")
         return self.bpm_status
 
     def read(self, *args, **kwargs):
+        """reads the data and resets state engine
+        """
         r = super().read(*args, **kwargs)
         self.validated_data.data_read()
         self.bpm_status = None
