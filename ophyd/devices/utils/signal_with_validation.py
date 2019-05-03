@@ -30,7 +30,7 @@ class FlickerSignal:
          call is running and will eventually mark the status object
          as done
     """
-    def __init__(self, signal, timeout = 3, validation_time = .5):
+    def __init__(self, signal, timeout = 3, validation_time = .1):
         """
 
         Args:
@@ -46,10 +46,12 @@ class FlickerSignal:
         self.validation_time = validation_time #s
         self.loop = asyncio.get_event_loop()
         self.__logger = None
-
+        self._device_status = None
         # Used to find if data was resent
         self._n_triggered = 0
+        self.tic()
 
+    def tic(self):
         self._t0 = time.time()
 
     def setLogger(self, logger):
@@ -75,9 +77,10 @@ class FlickerSignal:
         assert(val >= 0)
         self._validation_time = val
 
-    def check_if_new_reading(self, expected_count, cid, device_status):
+    def check_if_new_reading(self, expected_count):
         """Just allow for it to arrive!
         """
+
         def log_debug(txt):
             tref = time.time() - self._t0
             txt = "tref {:.2f} ".format(tref) + txt
@@ -86,25 +89,27 @@ class FlickerSignal:
             if self.__logger:
                 self.__logger.info(txt)
 
+        device_status = self._device_status
+        assert(device_status is not None)
         now_count =  self._n_triggered
         fmt = "New data arrived?  counts: expected {} found {} "
         log_debug(fmt.format(expected_count, now_count))
         if now_count == expected_count:
-            log_debug("No new data arrived: done cnt {}!".format(now_count))
-            log_debug("No new data arrived: unscribing using cid {}!".format(cid))
-            self.signal.unsubscribe(cid)
+            log_debug("No new data arrived: done cnt {} unscribing!".format(now_count))
+            self.signal.clear_sub(self.delay_signal_status)
             log_debug("No new data arrived: marking device_status {} id({}) as done !".format(device_status, id(device_status)))
             # print("Unwrapped callbacks {} wrapped callbacks {}".format(
             #    self.signal._unwrapped_callbacks,
             #    self.signal._callbacks
             #    ))
             device_status._finished()
+            self._device_status = None
             del device_status
 
         else:
             log_debug("New data arrived: Expecting other trigger to mark status as done")
 
-    def delay_signal_status(self, device_status, cid, **kwargs):
+    def delay_signal_status(self, *args, **kwargs):
         """
         """
         def log_debug(txt):
@@ -121,7 +126,7 @@ class FlickerSignal:
         if self.loop.is_running():
             #log_debug("Executing using asyncio loop")
             def check_and_finish():
-                self.check_if_new_reading(ref_cnt, cid, device_status)
+                self.check_if_new_reading(ref_cnt)
 
             self.loop.call_later(self.validation_time, check_and_finish)
 
@@ -129,12 +134,23 @@ class FlickerSignal:
             #log_debug("Executing using thread")
             def sleep_and_finish():
                 time.sleep(self.validation_time)
-                self.check_if_new_reading(ref_cnt, cid, device_status)
+                self.check_if_new_reading(ref_cnt)
 
             threading.Thread(target=sleep_and_finish, daemon=True).start()
 
         log_debug("Finished delay signal status")
         return True
+
+    def execute_validation(self, device_status):
+        if self._device_status is None:
+            pass
+        else:
+            assert(self._device_status is device_status)
+
+        self._device_status = device_status
+        self._n_triggered = 0
+        cid = self.signal.subscribe(self.delay_signal_status,  run = True)
+        #print("Subscribers {}".format(self.signal._unwrapped_callbacks))
 
     def trigger_and_validate(self):
         #print("Got trigger: state machine state {}".format(self._acquisition_state.state))
@@ -143,13 +159,7 @@ class FlickerSignal:
             kws["timeout"] = self._timeout
 
         device_status = DeviceStatus(device=self.signal, timeout = self.timeout)
-
-        def cb(*args, **kwargs):
-            nonlocal device_status, cid
-            self.delay_signal_status(device_status, cid, *args, **kwargs)
-
-        self._n_triggered = 0
-        cid = self.signal.subscribe(cb,  run = False)
+        self.execute_validation(device_status)
         return device_status
 
     def data_read(self):
