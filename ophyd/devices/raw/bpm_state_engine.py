@@ -119,6 +119,8 @@ class BPMMeasurementStates:
 
         self.measurement_state.set_finished()
 
+    def set_failed(self):
+        self.measurement_state.set_failed()
 
     def onValueChange(self, *args, obj = None, **kwargs):
 
@@ -130,13 +132,18 @@ class BPMMeasurementStates:
         r = method(*args, **kwargs)
         return r
 
-    def onValueChangeIdle(self, *args, **kwargs):
+    def onValueChangeIdle(self, *args, name = None, **kwargs):
         """
 
         Todo:
             Review if exception to be raised if called
         """
         self.log("on value idle args {} kwargs {}".format(args, kwargs))
+
+        fmt = "Idle: should not have been called: dt {} name {}"
+        self.set_failed()
+        raise AssertionError(fmt.format(dt, name))
+
 
     def onValueChangeTriggered(self, *args, name = None, **kwargs):
         """Start acquiring when ready signals low value
@@ -175,6 +182,7 @@ class BPMMeasurementStates:
         elif name == "bpm_waveform_packed_data":
             self.log("Acquire dt {:.2f} got bdata".format(self.dt))
         else:
+            self.set_failed()
             raise AssertionError("name {} unknown".format(name))
 
     def onValueChangeValidate(self, *args, name = None, **kwargs):
@@ -188,6 +196,7 @@ class BPMMeasurementStates:
         """
         # self.log("on value validate args {} kwargs {}".format(args, kwargs))
         self.log("on value validate dt {:.2f} name {}".format(self.dt, name))
+
         if name == "bpm_waveform_ready":
             ready = kwargs["value"]
             self.log("Validate dt {:.2f} ready val = {}".format(self.dt, ready))
@@ -201,21 +210,28 @@ class BPMMeasurementStates:
             validated_data = self.parent.validated_data
             status = self.parent.bpm_status
             validated_data.execute_validation(status)
-        else:
-            raise AssertionError("name {} unknown".format(name))
-        pass
 
-    def onValueChangeFinished(self, *args, **kwargs):
+        else:
+            self.set_failed()
+            raise AssertionError("name {} unknown".format(name))
+
+
+    def onValueChangeFinished(self, *args, name = None, **kwargs):
         """
         Todo:
             Review if exception should be raised if called
         """
         self.log("on value finished args {} kwargs {}".format(args, kwargs))
+        fmt = "Finished: should not have been called: dt {} name {}"
+        self.set_failed()
+        raise AssertionError(fmt.format(dt, name))
 
-    def onValueChangeFailed(self, *args, **kwargs):
+    def onValueChangeFailed(self, *args, name = None,  **kwargs):
         """
 
         Todo:
             Review if exception should be raised if called
         """
         self.log("on value failed args {} kwargs {}".format(args, kwargs))
+        fmt = "Failed: should not have been called: dt {} name {}"
+        raise AssertionError(fmt.format(dt, name))
