@@ -5,12 +5,13 @@ A higher level of access is provided by
 """
 from ophyd import Component as Cpt, EpicsSignalRO
 from ophyd import Device
-from ophyd.status import Status
+from ophyd.status import DeviceStatus, AndStatus
 
 from ..pp.VectorSignalRO import VectorSignalRO
-from ..utils.EnsureNewValueWhenTriggered import EnsureNewValueWhenTriggered
-
+from .bpm_state_engine import BPMMeasurementStates
 from ..utils import signal_with_validation
+
+
 class BPMStatistics( Device ):
     """Average statistics of the beam position monitor
 
@@ -40,14 +41,35 @@ class BPMPackedData( Device ):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.new_trigger = EnsureNewValueWhenTriggered(minimum_delay = 10e-3, timeout = 3.0)
-        #self.validated_data = signal_with_validation.FlickerSignal(self.packed_data)
+        self.validated_data = signal_with_validation.FlickerSignal(self.packed_data)
+        # self.measurement_state = measurement_state_machine.AcquisitionState()
+        self.measurement_state = BPMMeasurementStates(parent = self)
+        self.bpm_status = None
+        self.save_counter = None
+
 
     def trigger(self):
-        return self.new_trigger.trigger_check(self.packed_data)
-        #return self.validated_data.trigger_and_validate()
- 
+        #return self.new_trigger.trigger_check(self.packed_data)
+
+        self.save_counter = None
+        max_tries = 20
+
+        bpm_timeout = 3.
+        self.bpm_status = None
+        self.bpm_status   = DeviceStatus(device=self.packed_data, timeout = bpm_timeout)
+        self.measurement_state.set_triggered()
+
+        # self.counter.subscribe()
+        # self.ready.subscribe(self.measurement_state.onValueChange)
+        # self.packed_data.subscribe(self.measurement_state.onValueChange)
+        # bpm_status.add_callback(self.measurement_state.onValueChange)
+
+        # print("bpm trigger finished")
+        return self.bpm_status
+
     def read(self, *args, **kwargs):
         r = super().read(*args, **kwargs)
-        #self.validated_data.data_read()
+        self.validated_data.data_read()
+        self.bpm_status = None
+        self.measurement_state.set_idle()
         return r
