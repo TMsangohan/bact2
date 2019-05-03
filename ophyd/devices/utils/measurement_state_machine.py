@@ -9,7 +9,9 @@ class AcquisitionState(super_state_machine.machines.StateMachine):
         """
         #: e.g. at start up or if everything has been made
         IDLE = 'idle'
-        #: after the devices was called with kickoff
+        #: Trigger was received ... waiting that the device gets ready
+        TRIGGERED = 'triggered'
+        #: after the devices was triggered and is ready to take data
         ACQUIRE = 'acquire'
         #: acquiring data done lets go again
         VALIDATE = 'validate'
@@ -22,10 +24,12 @@ class AcquisitionState(super_state_machine.machines.StateMachine):
         initial_state = "idle"
         transitions = {
             #: idle can be only set if it has finished or in
-            #: sending state. 
-            'idle': ['acquire', 'failed'],
-            #: 
-            'acquire' : ['validate', 'failed'],
+            #: sending state.
+            'idle': ['triggered', 'failed'],
+            #: triggered waiting to get ready
+            'triggered' :  ['acquire', 'failed'],
+            #: taking data
+            'acquire' : ['validate', 'finished', 'failed'],
             #: only start acquiring data if in idle state
             'validate' : ['finished', 'failed'],
             #: finished state only if in acquiring
@@ -33,5 +37,5 @@ class AcquisitionState(super_state_machine.machines.StateMachine):
             #: failed can be always made to
             #: Todo:
             #:   check for wildcard option
-            'failed' : ['idle', 'failed']
+            'failed' : ['idle', 'triggered', 'failed']
          }

@@ -4,11 +4,10 @@ import asyncio
 
 import time
 import sys
+import functools
 
 from ophyd.status import DeviceStatus, SubscriptionStatus
 from bact2.ophyd.utils.status.ExpectedValueStatus import ExpectedValueStatus
-
-from .measurement_state_machine import AcquisitionState
 
 class FlickerSignal:
     """Returns data, if no further data is provided during validation time
@@ -23,7 +22,7 @@ class FlickerSignal:
     Implementation:
        * when triggered a call back is subscribed to the variable
        * this callback increments the instance variable n_triggered
-       * then a delay is entered (as separate thread or using 
+       * then a delay is entered (as separate thread or using
          asyncio)
        * after the delay the value n_triggered is checked
        * if it is still the same the status object is marked as done
@@ -45,13 +44,10 @@ class FlickerSignal:
 
         # Time to wait that new data arrives
         self.validation_time = validation_time #s
-
-        self._acquisition_state = AcquisitionState()
-
         self.loop = asyncio.get_event_loop()
         self.__logger = None
 
-        # Used to find if data was resent 
+        # Used to find if data was resent
         self._n_triggered = 0
 
         self._t0 = time.time()
@@ -62,7 +58,7 @@ class FlickerSignal:
     @property
     def timeout(self):
         return self._timeout
-    
+
     @timeout.setter
     def timeout(self, val):
         val = float(val)
@@ -79,7 +75,7 @@ class FlickerSignal:
         assert(val >= 0)
         self._validation_time = val
 
-    def check_if_new_reading(self, expected_count, cid, status):
+    def check_if_new_reading(self, expected_count, cid, device_status):
         """Just allow for it to arrive!
         """
         def log_debug(txt):
@@ -97,15 +93,18 @@ class FlickerSignal:
             log_debug("No new data arrived: done cnt {}!".format(now_count))
             log_debug("No new data arrived: unscribing using cid {}!".format(cid))
             self.signal.unsubscribe(cid)
-            log_debug("No new data arrived: marking status id({}) as done !".format(id(status)))
-            status.success = True
-            status.done = True
-            status._finished()
+            log_debug("No new data arrived: marking device_status {} id({}) as done !".format(device_status, id(device_status)))
+            # print("Unwrapped callbacks {} wrapped callbacks {}".format(
+            #    self.signal._unwrapped_callbacks,
+            #    self.signal._callbacks
+            #    ))
+            device_status._finished()
+            del device_status
 
         else:
             log_debug("New data arrived: Expecting other trigger to mark status as done")
 
-    def delay_signal_status(self, status, cid, **kwargs):
+    def delay_signal_status(self, device_status, cid, **kwargs):
         """
         """
         def log_debug(txt):
@@ -122,7 +121,7 @@ class FlickerSignal:
         if self.loop.is_running():
             #log_debug("Executing using asyncio loop")
             def check_and_finish():
-                self.check_if_new_reading(ref_cnt, cid, status)
+                self.check_if_new_reading(ref_cnt, cid, device_status)
 
             self.loop.call_later(self.validation_time, check_and_finish)
 
@@ -130,11 +129,12 @@ class FlickerSignal:
             #log_debug("Executing using thread")
             def sleep_and_finish():
                 time.sleep(self.validation_time)
-                self.check_if_new_reading(ref_cnt, cid, status)
+                self.check_if_new_reading(ref_cnt, cid, device_status)
 
             threading.Thread(target=sleep_and_finish, daemon=True).start()
 
-        return status
+        log_debug("Finished delay signal status")
+        return True
 
     def trigger_and_validate(self):
         #print("Got trigger: state machine state {}".format(self._acquisition_state.state))
@@ -142,25 +142,24 @@ class FlickerSignal:
         if self._timeout is not None:
             kws["timeout"] = self._timeout
 
-        status = DeviceStatus(device=self.signal, timeout = self.timeout)
+        device_status = DeviceStatus(device=self.signal, timeout = self.timeout)
 
-        cid = None
-        def cb(**kwargs):
-            nonlocal status, cid
-            self.delay_signal_status(status, cid, **kwargs)
+        def cb(*args, **kwargs):
+            nonlocal device_status, cid
+            self.delay_signal_status(device_status, cid, *args, **kwargs)
 
-        cid = self.signal.subscribe(cb)
-        print("Subscribed using cid {} status id({})".format(cid, id(status)))
-        return status
+        self._n_triggered = 0
+        cid = self.signal.subscribe(cb,  run = False)
+        return device_status
 
     def data_read(self):
         #print("Data read for {}".format(self.signal.name))
-        
+
         #t_state = self._acquisition_state.state
         #if not self._acquisition_state.is_finished:
         #    raise AssertionError("state machine in state {} which is not finished!".format(t_state))
         #self._acquisition_state.set_idle()
         pass
-    
+
     def set_done(self):
         pass
