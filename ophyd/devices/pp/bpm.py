@@ -115,7 +115,7 @@ class BPMStorageRing( Device ):
     stat = Cpt(bpm_raw.BPMStatistics, "BPMZR", name = "stat")
     waveform = Cpt(BPMWaveform, "MDIZ2T5G", name = "wavefrom")
 
-    hints = {"fields" : ["stat_read"]}
+    # hints = {"fields" : ["stat_read"]}
     def trigger(self, *args, **kwargs):
         r = self.waveform.trigger(*args, **kwargs)
         return r
