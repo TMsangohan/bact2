@@ -41,6 +41,9 @@ class CounterSink( sim.SynAxisNoHints ):
         """
         status = super().set(*args, **kwargs)
 
+        if self._inform_on_set_done is None:
+            return status
+
         cb = self._inform_on_set_done.set_done
         if status.done:
             cb()
