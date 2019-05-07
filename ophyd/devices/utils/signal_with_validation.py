@@ -53,9 +53,21 @@ class FlickerSignal:
         # Used to find if data was resent
         self._n_triggered = 0
         self.tic()
+        self.tac()
 
     def tic(self):
         self._t0 = time.time()
+
+    def dt(self):
+        now = time.time()
+        dt = now - self._t0
+        return dt
+
+    def tac(self):
+        self._store_dt = self.dt()
+
+    def stored_dt(self):
+        return self._store_dt
 
     def setLogger(self, logger):
         self.__logger = logger
@@ -114,7 +126,9 @@ class FlickerSignal:
             del device_status
 
         else:
-            log_debug("New data arrived: Expecting other trigger to mark status as done")
+            self.parent.tac()
+            fmt = "New data arrived after {}: Expecting other trigger to mark status as done"
+            log_debug(fmt.format(self.stored_dt()))
 
     def delay_signal_status(self, *args, book_keeping = None, **kwargs):
         """
@@ -160,6 +174,7 @@ class FlickerSignal:
         assert(device_status is not None)
 
         self._n_triggered = 0
+        self.tic()
 
         class callback:
             def __init__(self, parent = None, device_status = None):
