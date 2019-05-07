@@ -44,7 +44,7 @@ class EpicsSignalStr( EpicsSignalRO ):
 class MultiplexerPowerConverter( PVPositionerPC ):
     """Access to the multiplexer value
     """
-    readback = Cpt(EpicsSignalStr, 'QSPAZR:rdbk')
+    readback = Cpt(EpicsSignal, 'QSPAZR:rdbk')
     setpoint = Cpt(EpicsSignal, 'QSPAZR:set')
     switch   = Cpt(EpicsSignal, 'QSPAZR:cmd1')
     status   = Cpt(EpicsSignalRO, 'QSPAZR:stat1')
@@ -85,7 +85,7 @@ class MultiplexerSelector( PVPositionerPC ):
     # setpoint = Cpt(TEpicsSignal, 'PMUXZR:name', )
 
     #: read back which power converter is selected
-    readback = Cpt(EpicsSignalStr, 'PMUXZR:name')
+    readback = Cpt(EpicsSignal, 'PMUXZR:name')
 
     #: store the one that was explicitily set
     selected = Cpt(Signal, name='selected', value ='non stored')
@@ -113,7 +113,7 @@ class MultiplexerSelector( PVPositionerPC ):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         # use a long validation time let's see if there are more changes
-        self.mux_switch_validate = signal_with_validation.FlickerSignal(self.readback, timeout=1, validation_time=2)
+        self.mux_switch_validate = signal_with_validation.FlickerSignal(self.readback, timeout=3, validation_time=2)
         self.__logger = logger
         self._timestamp = time.time()
 
@@ -164,20 +164,20 @@ class MultiplexerSelector( PVPositionerPC ):
                 fmt = 'selector was off  old_value {} == "Mux OFF" and value {} == selected device {} last set {}!'
                 self.__logger.info(fmt.format(old_value, value, selected_device_name, stored))
 
-            elif value == "Mux OFF" and old_value == stored:
+            elif value == "Mux OFF" and (stored == 'not stored' or old_value == stored):
                 fmt = 'value {} ==  selected device {} expecting two more steps ( old_value = {} != Mux OFF, last set {})'
                 self.__logger.info(fmt.format(value, selected_device_name, old_value, stored))
                 # Expect that we are going to reading three directly
                 add = 1
 
             elif value == selected_device_name and old_value == stored:
-                fmt = 'Expecting 2 more steps value {} ==  selected device {},  old_value {} == stored {})'
+                fmt = 'Expecting no more steps value {} ==  selected device {},  old_value {} == stored {})'
                 self.__logger.info(fmt.format(value, selected_device_name, old_value, stored))
                 do_finish = True
                 add = 2
 
             else:
-                fmt = 'value {} old_value {} did not expect any setting. selected device {} last set {}!'
+                fmt = 'value {} old_value {} did not expect this set of values. selected device {} last set {}!'
                 raise AssertionError(fmt.format(value, old_value, selected_device_name, stored))
 
         elif cnt_called == 2:
