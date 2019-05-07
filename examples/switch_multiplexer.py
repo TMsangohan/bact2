@@ -35,8 +35,6 @@ class SelectorPlot(LivePlot):
 def main():
 
     n_meas = 5
-
-
     cs = CounterSink(name = "count_bpm_reads", delay = .2)
     repeat = cycler(cs, range(n_meas))
 
@@ -94,3 +92,5 @@ def main():
 if __name__ == '__main__':
     plt.ion()
     main()
+    plt.ioff()
+    plt.show()
