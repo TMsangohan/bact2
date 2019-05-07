@@ -143,6 +143,8 @@ class MultiplexerSelector( PVPositionerPC ):
 
     def switchPowerconverter(self, name):
         """select the power converter to pack on
+
+        Now directly switching to the power converter required
         """
 
         # self.checkPpowerconverterMembers()
@@ -154,9 +156,7 @@ class MultiplexerSelector( PVPositionerPC ):
         assert(check_value == 0)
         assert(self.readback is not None)
 
-        stat_off = DeviceStatus(device=self.readback, timeout = self.timeout, settle_time = self.settle_time)
-        stat_on  = DeviceStatus(device=self.readback, timeout = self.timeout * 2, settle_time = self.settle_time)
-        
+        stat_on  = DeviceStatus(device=self.readback, timeout = self.timeout, settle_time = self.settle_time)
         def switch_on():
             """Require to chain the call backs
 
@@ -166,14 +166,14 @@ class MultiplexerSelector( PVPositionerPC ):
             self.__logger.info("Calling switch on for {}".format(name))
             self.switchMuxAndCheck(name, stat_on)
 
-        stat_off.add_callback(switch_on)
-        self.switchMuxAndCheck("Off", stat_off)
-
-        status = AndStatus(stat_off, stat_on)
-        return status
+        self.switchMuxAndCheck(name, stat_on)
+        return stat_on
 
     def set(self, value):
-        """Select the power converter to multiplex to
+        """Select the power converter selector
+
+        Todo:
+           Check that the value ios correct at the end
         """
 
         self.checkPowerconverterMembers()
