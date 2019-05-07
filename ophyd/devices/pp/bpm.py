@@ -40,7 +40,7 @@ class BPMWaveform(  bpm_raw.BPMPackedData ):
     """
 
     #: Number of valid beam position monitors
-    n_valid_bpms = 112
+    n_valid_bpms = 128
 
 
     #: Relative horizontal beam offset as measured by the beam position monitors
