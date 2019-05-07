@@ -49,7 +49,10 @@ class DoneBasedOnReadback(t_super):
             setting_parameters :
         """
         self._setting_parameters = None
+        self._timeout = None
         setting_parameters = kws.pop("setting_parameters", None)
+        timeout = kws.pop("timeout", 0.0)
+        timeout = float(timeout)
 
         super().__init__(*args, **kws)
 
@@ -60,7 +63,9 @@ class DoneBasedOnReadback(t_super):
             raise AssertionError(txt)
 
         self._setting_parameters = setpar
+        self._timeout = timeout
         self._checkSetup()
+
 
         # Required to trace the status of the device
         self._moving = None
@@ -75,6 +80,9 @@ class DoneBasedOnReadback(t_super):
         assert(self.setpoint is not None)
         self.setpoint.value
         self.setpoint.set
+
+        assert(self._timeout > 0)
+
 
     def _checkSettingParameters(self, setting_parameters):
         """Check and store setting Parameters
@@ -145,7 +153,7 @@ class DoneBasedOnReadback(t_super):
             return status
 
 
-        status = SubscriptionStatus(self.readback, callback)
+        status = SubscriptionStatus(self.readback, callback, timeout=self._timeout)
         self.setpoint.set(value)
 
         tup = self.__class__.__name__, value, status
@@ -163,6 +171,10 @@ class ReachedSetpoint(DoneBasedOnReadback):
         read back if the change is smaller than the value the
         IOC considers significant
     """
+
+    def _correctReadback(self, val):
+        return val
+
     def _positionReached(self, *args, **kws):
         """position within given range?
         """
@@ -170,6 +182,7 @@ class ReachedSetpoint(DoneBasedOnReadback):
         limit = self._setting_parameters
 
         rbk = self.readback.value
+        rbk = self._correctReadback(rbk)
 
         check_set_value = kws.pop("check_set_value", None)
         if check_set_value is None:
