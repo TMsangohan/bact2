@@ -23,6 +23,8 @@ import bact2
 import bact2.bluesky.hacks.callbacks
 from bact2.bluesky.hacks.callbacks import LivePlot
 from bact2.ophyd.devices.pp.bpm import BPMStorageRing
+import numpy as np
+
 
 def main():
 
@@ -48,22 +50,30 @@ def main():
 
 
     currents = (0, 1, -1, 0)
-    det = [bpm]
+    current_vals = np.array([0, 1, -1, 0])
+
+    bpm_det = [bpm]
 
     def step_steerer(steerer):
         nonlocal currents
+
+        current_offset = steerer.readback.get()
+        print(current_offset)
+        currents = current_vals * 1e-3 + current_offset
+
         for t_current in currents:
-            # yield from bps.mv(steerer.dev, t_current)
-            det = [col.selected, col.selected_steerer.dev.readback]
+            yield from bps.mv(steerer, t_current)
+            det = [col.selected, col.selected_steerer.dev.readback] + bpm_det
             yield from bp.count(det)
 
     def run_all():
         for name in steerer_names:
             yield from bps.mv(col, name)
-            yield from step_steerer(col.selected)
+            yield from bps.trigger(col.selected_steerer.dev.readback)
+            yield from step_steerer(col.selected_steerer.dev)
 
     RE(run_all(),
-           #LivePlot("sc_selected_dev_readback", "a_steerer_dev_setpoint",   ax = None, marker = '.'),
+       [LivePlot("sc_selected_readback", "sc_selected_setpoint",   ax = None, marker = '.')]
            )
 
 
