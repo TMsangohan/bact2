@@ -5,7 +5,7 @@ Warning:
 
 """
 
-from ophyd import Device, EpicsSignal, EpicsSignalRO, PVPositionerPC, Component as Cpt
+from ophyd import Device, Signal, EpicsSignal, EpicsSignalRO, PVPositionerPC, Component as Cpt
 from ophyd.status import Status, AndStatus, DeviceStatus
 from ophyd.areadetector.base import ad_group
 from ophyd.device import  DynamicDeviceComponent as DDC
@@ -18,6 +18,7 @@ t_quadrupoles = [(name, 'PMUXZR:' + name) for name in quadrupoles]
 import logging
 logger = logging.getLogger()
 
+import time
 
 
 class TEpicsSignal( EpicsSignal ):
@@ -43,7 +44,7 @@ class EpicsSignalStr( EpicsSignalRO ):
 class MultiplexerPowerConverter( PVPositionerPC ):
     """Access to the multiplexer value
     """
-    readback = Cpt(EpicsSignalStr, 'QSPAZR:rdbk')
+    readback = Cpt(EpicsSignal, 'QSPAZR:rdbk')
     setpoint = Cpt(EpicsSignal, 'QSPAZR:set')
     switch   = Cpt(EpicsSignal, 'QSPAZR:cmd1')
     status   = Cpt(EpicsSignalRO, 'QSPAZR:stat1')
@@ -84,7 +85,15 @@ class MultiplexerSelector( PVPositionerPC ):
     # setpoint = Cpt(TEpicsSignal, 'PMUXZR:name', )
 
     #: read back which power converter is selected
-    readback = Cpt(EpicsSignalStr, 'PMUXZR:name')
+    readback = Cpt(EpicsSignal, 'PMUXZR:name')
+
+    #: store the one that was explicitily set
+    selected = Cpt(Signal, name='selected', value ='non stored')
+
+    #: setpoint as index number
+    setpoint_num = Cpt(Signal, name='setpoint_num', value = -1)
+    #: selected as index number
+    selected_num = Cpt(Signal, name='selected_num', value = -1)
 
     #: switch power converter off ?
     off  = Cpt(EpicsSignal,   'PMUXZR:off', name = 'off')
@@ -95,10 +104,18 @@ class MultiplexerSelector( PVPositionerPC ):
     #: Todo: check if it is still working!
     relay_ps = Cpt(EpicsSignalRO, 'PMUXZR:relay_ps')
 
+    #: How long did it take to set the value
+    set_time = Cpt(Signal, name = "set_time", value = -1)
+
+    #: How long did it take to set the value
+    last_wait = Cpt(Signal, name = "last_wait", value = -1)
+
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.mux_switch_validate = signal_with_validation.FlickerSignal(self.readback, timeout=5, validation_time=3)
+        # use a long validation time let's see if there are more changes
+        self.mux_switch_validate = signal_with_validation.FlickerSignal(self.readback, timeout=3, validation_time=2)
         self.__logger = logger
+        self._timestamp = time.time()
 
     def setLogger(self, logger):
         self.__logger = logger
@@ -111,8 +128,145 @@ class MultiplexerSelector( PVPositionerPC ):
         pc.readback.get
 
 
-    def switchMuxAndCheck(self, name, device_status):
+    def checkMuxSwitches(self, cnt_called, set_traced, selected_device_name,
+                         old_value = None, value = None, **kwargs):
+        """Callback to follow that mux switches happen as expected
 
+        The muxer behaves in the following manner:
+
+        * If it was off:
+            1. response: the name of the selceted device
+            2. repsonse: Mux Off
+            3. response: the name of the selected device
+
+        * If a power converter was selected
+            1. repsonse: Mux Off
+            2. response: the name of the selected device
+
+        * And then there is one more thing:
+           1. It has directly set from the last selected device
+              to the requested one
+
+
+        Thou shall use state machines!
+        """
+        assert(value is not None)
+
+
+        stored =  self.selected.get()
+        fmt = "cnt called {} value {} old value {} selected device {} stored {}"
+        self.__logger.info(fmt.format(cnt_called, value, old_value, selected_device_name, stored))
+
+        add = 0
+        do_finish = False
+        if cnt_called == 1:
+            if old_value == "Mux OFF" and value == selected_device_name:
+                fmt = 'selector was off  old_value {} == "Mux OFF" and value {} == selected device {} last set {}!'
+                self.__logger.info(fmt.format(old_value, value, selected_device_name, stored))
+
+            elif value == "Mux OFF" and (stored == 'not stored' or old_value == stored):
+                fmt = 'value {} ==  selected device {} expecting two more steps ( old_value = {} != Mux OFF, last set {})'
+                self.__logger.info(fmt.format(value, selected_device_name, old_value, stored))
+                # Expect that we are going to reading three directly
+                add = 1
+
+            elif value == selected_device_name and old_value == stored:
+                fmt = 'Expecting no more steps value {} ==  selected device {},  old_value {} == stored {})'
+                self.__logger.info(fmt.format(value, selected_device_name, old_value, stored))
+                do_finish = True
+                add = 2
+
+            else:
+                fmt = 'value {} old_value {} did not expect this set of values. selected device {} last set {}!'
+                raise AssertionError(fmt.format(value, old_value, selected_device_name, stored))
+
+        elif cnt_called == 2:
+            if value != "Mux OFF":
+                fmt = 'expected value "Mux OFF" but got value "{}" selected_device_name = {} old value = {}'
+                raise AssertionError(fmt.format(value, selected_device_name, old_value))
+
+        elif cnt_called == 3:
+            do_finish = True
+
+
+        else:
+            fmt = "Did not expect to be called {} > 3 times value {} old value {}"
+            raise AssertionError(fmt.format(cnt_called, value, old_value))
+
+        if do_finish:
+            fmt = "cnt finished called {} value {}"
+            self.__logger.info(fmt.format(cnt_called, value))
+            if value == selected_device_name:
+                set_traced._finished()
+            else:
+                fmt = 'expected value "{} but got value "{}"'
+                raise AssertionError(fmt.format(selected_device_name, value))
+
+        return add
+
+    def switchMuxAndTrace(self, selected_device_name, device_status):
+        """switch the muxer directly from device
+
+        Checks the changes by following the switching on and off
+        """
+        pcs = self.parent.activate.pcs
+        pc_ac = getattr(pcs, selected_device_name)
+        self.__logger.info("power converter activate {}".format(pc_ac))
+
+        cnt_called = 0
+
+        set_traced  = DeviceStatus(device=self.readback, timeout = self.timeout, settle_time = self.settle_time)
+        def trace_cb(*args,  **kwargs):
+            nonlocal cnt_called, set_traced, selected_device_name
+            cnt_called +=1
+            add = self.checkMuxSwitches(cnt_called, set_traced, selected_device_name, **kwargs)
+            cnt_called += add
+
+        def remove_trace_cb():
+            nonlocal trace_cb
+            self.readback.clear_sub(trace_cb)
+
+        def validate_cb():
+            nonlocal device_status
+            self.__logger.info('Switching: checking readback. Name {}'.format(selected_device_name))
+            self.mux_switch_validate.execute_validation(device_status, run = True)
+
+        def store_selected():
+            nonlocal selected_device_name
+
+            val = self.readback.get()
+
+            if val != selected_device_name:
+                fmt = "Expected that device is selected {} but found device {}"
+                raise AssertionError(fmt.format(selected_device_name, val))
+
+            num = quadrupoles.index(val)
+            self.__logger.info('Storing last set to {} as num {}'.format(val, num))
+            self.selected.set(val)
+            self.selected_num.set(num)
+
+            now = time.time()
+            dt = now - self._timestamp
+            self.set_time.set(dt)
+
+            self.last_wait.set(self.mux_switch_validate.stored_dt())
+
+        set_traced.add_callback(validate_cb)
+        set_traced.add_callback(remove_trace_cb)
+        device_status.add_callback(store_selected)
+
+        n_cbs = len(self.readback.subscriptions)
+        fmt = "Switching readback has {} subscriptions"
+        self.__logger.info(fmt.format(n_cbs))
+
+        self.readback.subscribe(trace_cb, run = False)
+        status_set = pc_ac.set(1)
+
+    def switchMuxAndCheck(self, name, device_status):
+        """Switch the muxer if required
+
+        See :meth:`switchMuxAndTrace` for the heavy lifting
+        """
         assert(device_status is not None)
         if name == "Off":
             # What has to be written to the device....
@@ -127,19 +281,7 @@ class MultiplexerSelector( PVPositionerPC ):
             status_set = self.off.set(1)
 
         else:
-            pcs = self.parent.activate.pcs
-            pc_ac = getattr(pcs, name)
-            self.__logger.info("power converter activate {}".format(pc_ac))
-            status_set = pc_ac.set(1)
-
-        def cb():
-            nonlocal device_status
-            self.__logger.info('Switching: checking readback. Name {}'.format(name))
-            self.mux_switch_validate.execute_validation(device_status, run = False)
-
-        status_set.add_callback(cb)
-        fmt = "set status {} check status {}"
-        self.__logger.info(fmt.format(status_set, device_status))
+            self.switchMuxAndTrace(name, device_status)
 
     def switchPowerconverter(self, name):
         """select the power converter to pack on
@@ -157,15 +299,6 @@ class MultiplexerSelector( PVPositionerPC ):
         assert(self.readback is not None)
 
         stat_on  = DeviceStatus(device=self.readback, timeout = self.timeout, settle_time = self.settle_time)
-        def switch_on():
-            """Require to chain the call backs
-
-            To be called after switch off has been made
-            """
-            nonlocal name, stat_on
-            self.__logger.info("Calling switch on for {}".format(name))
-            self.switchMuxAndCheck(name, stat_on)
-
         self.switchMuxAndCheck(name, stat_on)
         return stat_on
 
@@ -175,6 +308,11 @@ class MultiplexerSelector( PVPositionerPC ):
         Todo:
            Check that the value ios correct at the end
         """
+
+        self._timestamp = time.time()
+        num = quadrupoles.index(value)
+        self.setpoint_num.set(num)
+        del num
 
         self.checkPowerconverterMembers()
         self.mux_switch_validate.tic()
@@ -198,6 +336,21 @@ class MultiplexerSelector( PVPositionerPC ):
         stat_off = self.off.trigger()
 
         return AndStatus(AndStatus(stat_rbk, stat_relay), stat_off)
+
+
+    def stage(self):
+        """
+
+        Just for symmetry
+        """
+
+    def unstage(self):
+        """
+
+        Todo:
+           To be sure that its left over as off
+        """
+        self.off.set(1)
 
 class Multiplexer( Device ):
     """

@@ -1,3 +1,8 @@
+import matplotlib
+matplotlib.use("Qt5Agg")
+import matplotlib.pyplot as plt
+
+
 from cycler import cycler
 
 import bluesky.plans as bp
@@ -18,8 +23,25 @@ sys.path.append('/home/tmerten/gitlab-repos-hzb/suitcase-elasticsearch/')
 
 from bact2.ophyd.utils.preprocessors.CounterSink import CounterSink
 from bact2.ophyd.devices.pp.bpm import BPMStorageRing
+import bact2
+import bact2.bluesky.hacks.callbacks
+from bact2.bluesky.hacks.callbacks import LivePlot
+
 import numpy as np
 
+
+class BPMLivePlot(LivePlot):
+    """Scale plot data
+    """
+    #: scale factor of y data
+    #: mm/ mA
+    scale_dep = 1
+    def update_caches(self, x, y):
+        # Scale to kHz
+        x = x / 1000.
+        # Scale the current
+        y = y * self.scale_dep
+        return super().update_caches(x,y)
 
 
 def main():
@@ -52,7 +74,7 @@ def main():
     bec = bc.best_effort.BestEffortCallback()
 
     RE = RunEngine({})
-    # RE.log.setLevel("INFO")
+    RE.log.setLevel("DEBUG")
     #print(dir(bpm))
     bpm.waveform.validated_data.setLogger(RE.log)
     bpm.waveform.measurement_state.setLogger(RE.log)
@@ -68,4 +90,5 @@ def main():
 
 
 if __name__ == '__main__':
-	main()
+    plt.ion()
+    main()
