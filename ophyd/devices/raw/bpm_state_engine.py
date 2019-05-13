@@ -402,7 +402,7 @@ class BPMMeasurementStates:
 
             fmt = "At {:.3f} s: finishing at {} validation calls"
             txt = fmt.format(self.dt, ref_cnt)
-            if ref_cnt != 1:
+            if ref_cnt > 1:
                 self.__logger.info(txt)
             # That's necessary. Not known if this callback will end up here again
             clear_callbacks_to_signals()
@@ -454,7 +454,7 @@ class BPMMeasurementStates:
                 pass
 
         # Everything defined over the call backs. So let's
-        # subscribe them and let the call backs to the work
+        # subscribe them and let the call backs do the work
         for signal in signals:
             signal.subscribe(update_cb, run = False)
 

@@ -21,7 +21,6 @@ sys.path.append('/home/tmerten/gitlab-repos-hzb/suitcase-elasticsearch/')
 
 # from suitcase.elasticsearch import Serializer
 
-from bact2.ophyd.utils.preprocessors.CounterSink import CounterSink
 from bact2.ophyd.devices.pp.bpm import BPMStorageRing
 import bact2
 import bact2.bluesky.hacks.callbacks
@@ -51,11 +50,10 @@ def main():
     # The frequency range
     f0 = 10
     f1 = 14
-    freq = np.linspace(f0, f1, 3)
+    freq = np.linspace(f0, f1, 5)
 
 
     bpm = BPMStorageRing(name = "bpm")
-    cs = CounterSink(name = "count_bpm_reads", delay = .0)
     cs = sim.motor2
 
     # cs.inform_set_done = bpm.waveform.new_trigger

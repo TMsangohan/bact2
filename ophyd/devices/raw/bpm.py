@@ -46,7 +46,7 @@ class BPMPackedData( Device ):
         super().__init__(*args, **kwargs)
         self.measurement_state = BPMMeasurementStates(parent = self)
         self.bpm_timeout = 3.0
-        self.validation_time = 0.8
+        self.validation_time = 0.1
 
     def trigger(self):
         """Inform the measurement state engine that measurement starts
