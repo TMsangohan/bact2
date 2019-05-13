@@ -1,4 +1,5 @@
-from ..utils import measurement_state_machine, execute_async
+from ..utils import measurement_state_machine
+from ...utils import execute_async
 from ophyd.status import DeviceStatus
 import time
 import logging
@@ -56,13 +57,13 @@ class BPMMeasurementStates:
     """
     def __init__(self, *args, parent = None, **kwargs):
         assert(parent is not None)
-        self._timestamp = None
+        self.__timestamp = None
         self._counter = None
         self.parent = parent
         self.createMethodsDic()
         self.measurement_state = measurement_state_machine.AcquisitionState()
+        self._execute_async = execute_async.ExecuteAsynchronisly()
         self.__logger = logger
-        self._execute_async = execute_async.ExeExecuteAsynchronisly()
 
     def setLogger(self, logger):
         self.__logger = logger
@@ -78,7 +79,7 @@ class BPMMeasurementStates:
             }
 
     def tic(self):
-        self._timestamp = time.time()
+        self.__timestamp = time.time()
 
     @property
     def dt(self):
@@ -86,32 +87,62 @@ class BPMMeasurementStates:
 
         Used for logging as user information
         """
-        if self._timestamp is None:
+        if self.__timestamp is None:
             return -1.0
 
         now = time.time()
-        dt = now - self._timestamp
+        dt = now - self.__timestamp
         return dt
 
     def checkCounter(self, val):
         val = int(val)
         if self._counter is None:
             self._counter = val
+            return
+
+
+        if val == self._counter:
+            fmt = "At {:.3f} got same counter value {} once again"
+            self.__logger.debug(fmt.format(self.dt, self._counter))
+            return None
+
+        state = self.measurement_state
+        fmt = "At {:.5f} state {} counter value changed from {} to {} "
+        txt = fmt.format(self.dt, state.state, self._counter, val, )
+
+
+        if state.is_idle:
+            self.__logger.info(txt)
+            return None
+
+        elif state.is_triggered:
+            self.__logger.info(txt)
+            self._counter = None
+            return None
+
+        elif state.is_acquire:
+            self.__logger.info(txt)
+            return txt
+
+        elif state.is_validate:
+            self.__logger.info(txt)
+            return txt
+
+        elif state.is_finished:
+            self.__logger.error(txt)
+            raise AssertionError(txt)
+
+        elif state.is_failed:
+            self.__logger.info(txt)
+            return txt
         else:
-            if val == self._counter:
-                fmt = "Got same counter value {} once again"
-                self.__logger.info(fmt.format(self._counter))
-            else:
-                fmt = "Counter value changed from {} to {}"
-                txt = fmt.format(self._counter, val)
-                self.__logger.error(txt)
-                raise AssertionError(txt)
+            raise AssertionError("should not end up here")
 
     def set_idle(self):
         """Typically: we are done ..
         """
         self.measurement_state.set_idle()
-        self._timestamp = None
+        # self._timestamp = None
         self._counter = None
 
     def set_triggered(self):
@@ -120,9 +151,10 @@ class BPMMeasurementStates:
         Todo:
             Review if the subscription should be permanent?
         """
-        self._counter = None
         self.measurement_state.set_triggered()
+        self._counter = None
         self.tic()
+        self.__logger.debug("At {:.3f} s: triggered acquisition ".format(self.dt))
 
     def set_acquire(self):
         """
@@ -130,17 +162,26 @@ class BPMMeasurementStates:
         When BPM signals that status is finished set the state
         engine to finished to
         """
+        fmt = "At {:.3f} s: setting to acquire mode after "
+        self.__logger.debug(fmt.format(self.dt))
         self.measurement_state.set_acquire()
+
+    def set_validate(self):
+        fmt = "At {:.3f} s: setting to validate mode: measurement took"
+        self.__logger.debug(fmt.format(self.dt))
+        self.measurement_state.set_validate()
+        self.tic()
 
     def set_finished(self):
         """
 
         Remove the callbacks to the changed values
         """
-        self.log("Finished acquistion dt = {:.2f}".format(self.dt))
+        self.__logger.debug("At {:.3f} s: finished acquistion ".format(self.dt))
         self.measurement_state.set_finished()
 
     def set_failed(self):
+        self.__logger.debug("Switched to fail state dt = {:.3f}".format(self.dt))
         self.measurement_state.set_failed()
 
     def onValueChange(self, *args, obj = None, **kwargs):
@@ -173,10 +214,14 @@ class BPMMeasurementStates:
             name = translations[raw_name]
         except KeyError as ke:
             name = raw_name
-
         # All methods expect a translated name
         kwargs.setdefault('name', name)
+
         method = self.onValueChangeMethods[self.measurement_state.state]
+
+        fmt = "At {}:,3f onValueChange delegating to {} args {} kwargs {}"
+        self.__logger.debug(fmt.format(self.dt, method, args, kwargs))
+
         r = method(*args, **kwargs)
         return r
 
@@ -186,7 +231,7 @@ class BPMMeasurementStates:
         Todo:
             Review if exception to be raised if called
         """
-        self.log("on value idle args {} kwargs {}".format(args, kwargs))
+        self.__logger.info("on value idle args {} kwargs {}".format(args, kwargs))
 
         fmt = "Idle: should not have been called: dt {} name {}"
         self.set_failed()
@@ -201,11 +246,11 @@ class BPMMeasurementStates:
         """
         #self.log("on value triggered args {} kwargs {}".format(args, kwargs))
 
-        self.log("Triggered by name {}".format(name))
+        self.__logger.debug("At {:.3f} s: change triggered by name {}".format(self.dt, name))
         if name == "ready":
             ready = kwargs["value"]
-            txt = "Triggered ready val = {}".format(ready)
-            self.log(txt)
+            txt = "At {:.3f} s: triggered ready val = {}".format(self.dt, ready)
+            self.__logger.debug(txt)
             if not ready:
                 # Waiting for the data!
                 self.set_acquire()
@@ -216,20 +261,23 @@ class BPMMeasurementStates:
         If ready returns to high switch to validate
         """
         #self.log("on value acquire args {} kwargs {}".format(args, kwargs))
-        self.log("on value acquire dt {:.2f} name {}".format(self.dt, name))
+        self.__logger.debug("At {:.3f} s: on change acquire name {}".format(self.dt, name))
 
         value = kwargs["value"]
         if name == 'ready':
             ready = value
-            self.log("Acquire dt {:.2f} ready val = {}".format(self.dt, ready))
+            self.__logger.debug("At {:.3f} s: acquire ready val = {}".format(self.dt, ready))
             if ready:
-                self.measurement_state.set_validate()
+                self.set_validate()
 
-        elif name == 'counter'
-            self.checkCounter(value)
+        elif name == 'counter':
+            txt = self.checkCounter(value)
+            if txt:
+                self.__logger.info(txt)
+                self.set_validate()
 
         elif name == 'packed_data':
-            self.log("Acquire dt {:.2f} got bdata".format(self.dt))
+            self.set_validate()
 
         else:
             self.set_failed()
@@ -245,22 +293,19 @@ class BPMMeasurementStates:
             Review if a check should be made if ready falls off to low
         """
         # self.log("on value validate args {} kwargs {}".format(args, kwargs))
-        self.log("on value validate dt {:.2f} name {}".format(self.dt, name))
+        self.__logger.debug("At {:.3f}: validate {}".format(self.dt, name))
 
 
         value = kwargs["value"]
         if name == "ready":
             ready = value
-            self.log("Validate dt {:.2f} ready val = {}".format(self.dt, ready))
+            self.__logger.info("Validate dt {:.3f} ready val = {}".format(self.dt, ready))
 
         elif name == 'counter':
             self.checkCounter(value)
 
         elif name == 'packed_data':
-            self.log("Validate got bdata: now last check")
-            validated_data = self.parent.validated_data
-            status = self.parent.bpm_status
-            validated_data.execute_validation(status)
+            self.__logger.info("Validate got bdata: now last check")
 
         else:
             self.set_failed()
@@ -272,7 +317,7 @@ class BPMMeasurementStates:
         Todo:
             Review if exception should be raised if called
         """
-        self.log("on value finished args {} kwargs {}".format(args, kwargs))
+        self.__logger.info("on value finished args {} kwargs {}".format(args, kwargs))
         fmt = "Finished: should not have been called: dt {} name {}"
         self.set_failed()
         raise AssertionError(fmt.format(dt, name))
@@ -283,12 +328,12 @@ class BPMMeasurementStates:
         Todo:
             Review if exception should be raised if called
         """
-        self.log("on value failed args {} kwargs {}".format(args, kwargs))
+        self.__logger.info("on value failed args {} kwargs {}".format(args, kwargs))
         fmt = "Failed: should not have been called: dt {} name {}"
         raise AssertionError(fmt.format(dt, name))
 
 
-    def watch_and_take_datas(self, timeout = None, validation_time = None):
+    def watch_and_take_data(self, timeout = None, validation_time = None):
         """Get the bpm data at the right moment
 
         This method does the heavy lifting. Installs callbacks for data
@@ -318,11 +363,14 @@ class BPMMeasurementStates:
             fmt = "validation time {} must not be larger than timeout {}"
             raise AssertionError(fmt.format(validation_time, timeout))
 
+        # Why do I need to do that here ..
+        # self.tic()
+
 
         status = DeviceStatus(self.parent, timeout = timeout)
         # Does this raise an exception on failure?
-        self.measurement_state.set_triggered()
-        if self.is_failed():
+        self.set_triggered()
+        if self.measurement_state.is_failed:
             status._finished(success = False)
             return status
 
@@ -345,15 +393,20 @@ class BPMMeasurementStates:
             Checks the counter value if it matches the refcount
             """
             nonlocal n_updates_during_validation, status
+
             if n_updates_during_validation != ref_cnt:
-                fmt = "Expeected {} validation calls but found {} calls. Not setting finishs"
-                self.__logger.info(fmt.fromat(ref_cnt, n_updates_during_validation))
+                fmt = "At {:.3f} s: validating: expected {} validation calls but found {} calls."\
+                  " Not setting finish"
+                self.__logger.info(fmt.format(self.dt, ref_cnt, n_updates_during_validation))
                 return
 
-            fmt = "Finishing at {} validation calls"
-            self.__logger.info(fmt.fromat(ref_cnt))
+            fmt = "At {:.3f} s: finishing at {} validation calls"
+            txt = fmt.format(self.dt, ref_cnt)
+            if ref_cnt != 1:
+                self.__logger.info(txt)
             # That's necessary. Not known if this callback will end up here again
             clear_callbacks_to_signals()
+            self.set_finished()
             status._finished()
 
 
@@ -364,7 +417,7 @@ class BPMMeasurementStates:
             Set the status depending on the state machine status
             Handles validation over to :func:`check_and_finish`
             """
-            nonlocal status, signals
+            nonlocal status, signals, n_updates_during_validation
 
             if status.done:
                 clear_callbacks_to_signals()
@@ -373,20 +426,23 @@ class BPMMeasurementStates:
                 self.onValueChange(*args, **kwargs)
             except Exception as e:
                 clear_callbacks_to_signals()
+                fmt = "onValueChange failed for args {} kwargs {} reason: {}"
+                self.__logger.error(fmt.format(args, kwargs, e))
                 status._finished(success = False)
+                raise e
                 return
 
-            if self.measurement_state_machine.is_finished:
+            if self.measurement_state.is_finished:
                 clear_callbacks_to_signals()
                 status._finished(success = True)
                 return
 
-            elif self.measurement_state_machine.is_failed:
+            elif self.measurement_state.is_failed:
                 clear_callbacks_to_signals()
                 status._finished(success = False)
                 return
 
-            elif self.measurement_state_machine.is_validate:
+            elif self.measurement_state.is_validate:
                 # Check if a signal was still called
                 # The details are handled by :func:`check_and_finish`
                 # NB: n_updates_during_validation must be an in place increment
@@ -399,7 +455,7 @@ class BPMMeasurementStates:
 
         # Everything defined over the call backs. So let's
         # subscribe them and let the call backs to the work
-        for signal in siganals:
+        for signal in signals:
             signal.subscribe(update_cb, run = False)
 
         return status
