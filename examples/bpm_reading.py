@@ -24,23 +24,37 @@ sys.path.append('/home/tmerten/gitlab-repos-hzb/suitcase-elasticsearch/')
 from bact2.ophyd.devices.pp.bpm import BPMStorageRing
 import bact2
 import bact2.bluesky.hacks.callbacks
-from bact2.bluesky.hacks.callbacks import LivePlot
+from bact2.bluesky.hacks.callbacks import LivePlot, AxisWrapper
 
 import numpy as np
 
 
-class BPMLivePlot(LivePlot):
+class PlotLineVsIndex(LivePlot):
+    """plot data versus index
+    """
+    def update_caches(self, x, y):
+        #print("x", x)
+        ind = np.arange(len(y))
+        self.x_data = ind
+        self.y_data = y
+
+class BPMLivePlot(PlotLineVsIndex):
     """Scale plot data
     """
     #: scale factor of y data
     #: mm/ mA
     scale_dep = 1
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.old_value = None
+
     def update_caches(self, x, y):
         # Scale to kHz
-        x = x / 1000.
-        # Scale the current
-        y = y * self.scale_dep
-        return super().update_caches(x,y)
+        if self.old_value is None:
+            self.old_value = y
+        dy = y - self.old_value
+        super().update_caches(x, dy)
+
 
 
 def main():
@@ -85,7 +99,21 @@ def main():
     # serializer = Serializer('localhost',9200)
     # RE.subscribe(serializer)
 
-    RE(bp.scan_nd(det, sw_freq * repeat))
+    fig1 = plt.figure(1)
+    ax1 = plt.subplot(211)
+    ax2 = plt.subplot(212)
+    ax1 = AxisWrapper(ax1)
+    ax2 = AxisWrapper(ax2)
+    fig1 = plt.figure(2)
+    ax3 = plt.subplot()
+    ax3 = AxisWrapper(ax3)
+    RE(bp.scan_nd(det, sw_freq * repeat),
+       [
+           BPMLivePlot("bpm_waveform_pos_x", ax = ax1, legend_keys = ['x']),
+           BPMLivePlot("bpm_waveform_pos_y", ax = ax2, legend_keys = ['y']),
+           PlotLineVsIndex("bpm_waveform_status", ax = ax3, legend_keys = ['stat']),
+       ]
+    )
 
 
 if __name__ == '__main__':
