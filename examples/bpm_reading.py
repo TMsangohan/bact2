@@ -75,8 +75,9 @@ def main():
 
     RE = RunEngine({})
     RE.log.setLevel("DEBUG")
+    RE.log.setLevel("INFO")
     #print(dir(bpm))
-    bpm.waveform.validated_data.setLogger(RE.log)
+    #bpm.waveform.validated_data.setLogger(RE.log)
     bpm.waveform.measurement_state.setLogger(RE.log)
 
     RE.subscribe(bec)
