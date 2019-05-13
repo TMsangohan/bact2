@@ -44,28 +44,20 @@ class BPMPackedData( Device ):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.validated_data = signal_with_validation.FlickerSignal(self.packed_data)
         self.measurement_state = BPMMeasurementStates(parent = self)
         self.bpm_timeout = 3.0
 
     def trigger(self):
         """Inform the measurement state engine that measurement starts
         """
-        self.bpm_status = None
-        self.bpm_status = DeviceStatus(device=self.packed_data,
-                                           timeout = self.bpm_timeout)
         # Inform the measurement state engine that data acquistion
         # starts
-        self.measurement_state.set_triggered()
-
-        # print("bpm trigger finished")
-        return self.bpm_status
+        status = self.measurement_state.watch_and_set_data(timeout = bpm_timeout)
+        return status
 
     def read(self, *args, **kwargs):
         """reads the data and resets state engine
         """
         r = super().read(*args, **kwargs)
-        self.validated_data.data_read()
-        self.bpm_status = None
         self.measurement_state.set_idle()
         return r
