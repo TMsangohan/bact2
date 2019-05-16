@@ -33,10 +33,9 @@ class PlotLineVsIndex(LivePlot):
     """plot data versus index
     """
     def update_caches(self, x, y):
-        #print("x", x)
         ind = np.arange(len(y))
-        self.x_data = ind
-        self.y_data = y
+        self.x_data = ind.tolist()
+        self.y_data = y.tolist()
 
 class BPMLivePlot(PlotLineVsIndex):
     """Scale plot data
@@ -59,7 +58,7 @@ class BPMLivePlot(PlotLineVsIndex):
 
 def main():
     # Repeat the measurement 5 times
-    n_meas = 20
+    n_meas = 50
 
     # The frequency range
     f0 = 10
@@ -86,11 +85,10 @@ def main():
     bec = bc.best_effort.BestEffortCallback()
 
     RE = RunEngine({})
-    RE.log.setLevel("DEBUG")
+    # RE.log.setLevel("DEBUG")
     RE.log.setLevel("INFO")
     #print(dir(bpm))
-    #bpm.waveform.validated_data.setLogger(RE.log)
-    bpm.waveform.measurement_state.setLogger(RE.log)
+    # bpm.waveform.measurement_state.setLogger(RE.log)
 
     RE.subscribe(bec)
     install_qt_kicker()
@@ -119,3 +117,5 @@ def main():
 if __name__ == '__main__':
     plt.ion()
     main()
+    plt.ioff()
+    plt.show()

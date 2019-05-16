@@ -5,12 +5,8 @@ A higher level of access is provided by
 """
 from ophyd import Component as Cpt, EpicsSignalRO
 from ophyd import Device
-from ophyd.status import DeviceStatus, AndStatus
-
-from ..pp.VectorSignalRO import VectorSignalRO
-from .bpm_state_engine import BPMMeasurementStates
-from ..utils import signal_with_validation
-
+from ophyd.status import SubscriptionStatus
+from ...utils.status.ExpectedValueStatus import ExpectedValueStatus
 
 class BPMStatistics( Device ):
     """Average statistics of the beam position monitor
@@ -44,7 +40,8 @@ class BPMPackedData( Device ):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.measurement_state = BPMMeasurementStates(parent = self)
+        # from .bpm_state_engine import BPMMeasurementStates
+        # self.measurement_state = BPMMeasurementStates(parent = self)
         self.bpm_timeout = 3.0
         self.validation_time = 0.1
 
@@ -54,13 +51,26 @@ class BPMPackedData( Device ):
         # Inform the measurement state engine that data acquistion
         # starts
 
-        status = self.measurement_state.watch_and_take_data(timeout = self.bpm_timeout,
-                                                                validation_time = self.validation_time)
+
+        def cb(**kwargs):
+            """Wait for new data
+
+            If this data is here we are done ...
+            """
+            return True
+
+        t_cls = SubscriptionStatus
+        t_cls = ExpectedValueStatus
+        status = t_cls(self.packed_data, cb, timeout = self.bpm_timeout, run = False)
         return status
+
+        #status = self.measurement_state.watch_and_take_data(timeout = self.bpm_timeout,
+        #                                                        validation_time = self.validation_time)
+        #return status
 
     def read(self, *args, **kwargs):
         """reads the data and resets state engine
         """
         r = super().read(*args, **kwargs)
-        self.measurement_state.set_idle()
+        # self.measurement_state.set_idle()
         return r
