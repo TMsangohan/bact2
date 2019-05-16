@@ -1,10 +1,12 @@
-from ophyd import Device, Signal, EpicsSignal, EpicsSignalRO, PVPositionerPC, Component as Cpt
-from ophyd.status import Status, AndStatus, DeviceStatus
+from ophyd import EpicsSignal, EpicsSignalRO, PVPositionerPC, Component as Cpt
+from ophyd.status import  SubscriptionStatus
 
-from ..utils import signal_with_validation
-from ..utils.ReachedSetPoint import ReachedSetpoint
+# from ..utils import signal_with_validation
+# from ..utils.ReachedSetPoint import ReachedSetpoint
 
-class PowerConverter( ReachedSetpoint ):
+
+
+class PowerConverter( PVPositionerPC ):
     """A power converter abstraction
 
     Currently only a device checking that the set and read value corresponds
@@ -15,6 +17,3 @@ class PowerConverter( ReachedSetpoint ):
     """
     setpoint = Cpt(EpicsSignal,   ':set')
     readback = Cpt(EpicsSignalRO, ':rdbk')
-
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
