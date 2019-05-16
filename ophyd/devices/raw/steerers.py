@@ -1,42 +1,138 @@
 from ophyd import Signal, Device, Component as Cpt
 from ophyd.areadetector.base import ad_group
 from ophyd.device import  DynamicDeviceComponent as DDC
-from ophyd.status import Status
+from ophyd.status import AndStatus
 
 from .power_converter import PowerConverter
+from ..utils import trigger_on_update
 from .steerer_list import horizontal_steerers, vertical_steerers
-from collections import OrderedDict
 import numpy as np
-import string
-import logging
 
-logger = logging.getLogger()
-
-class Steerer( Device ):
-    """Steerer with certain settings
-    """
-    dev = Cpt(PowerConverter, '', egu='A',
-              #setting_parameters = 0.1,
-              timeout = 2)
 
 
 all_steerers = horizontal_steerers + vertical_steerers
+all_steerers = all_steerers
 t_steerers = [(name.lower(), name) for name in all_steerers]
 
 
-class SignalHelper( Signal ):
-    def set_cb(args, **kwargs):
-        # fmt = "set_cb args {} kwargs {}"
-        # print(fmt.format(args, kwargs))
-        value = kwargs["value"]
-        return super().set(value)
+
+class SignalProxy( Signal ):
+    """Proxy the signal to a
+    """
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.__signal_to_proxy = None
+
+    @property
+    def signal_to_proxy(self):
+        if self.__signal_to_proxy is None:
+            raise AssertionError("No signal to proxy found in {}".format(self.name))
+        return self.__signal_to_proxy
+
+    @signal_to_proxy.setter
+    def signal_to_proxy(self, sig):
+        assert(callable(sig.set))
+        assert(callable(sig.read))
+        assert(callable(sig.trigger))
+        if not sig.connected:
+            sig.wait_for_connection()
+        self.__signal_to_proxy = sig
+
+    def remove_proxy_signal(self):
+        self.__signal_to_proxy = None
+
+
+    def set(self, *args, **kwargs):
+        sig = self.signal_to_proxy
+        return sig.set(*args, **kwargs)
 
     def trigger(self):
-        return self.parent.selected_steerer.trigger()
+        sig = self.signal_to_proxy
+        status = sig.trigger()
+        self.log.debug("{}.trigger returns {}".format(self.name, status))
+        return status
 
     def read(self):
-        return self.parent.selected_steerer.read()
+        """Substituting the name with the proxy name
+        """
+        sig = self.signal_to_proxy
+        proxy_name = self.signal_to_proxy.name
+        # print(proxy_name, self.name)
+        r = sig.read()
+        d = {}
+        for key, item in r.items():
+            if key == proxy_name:
+                key2 = self.name
+                d[key2] = item
+            d[key] = item
+        fmt = "{}.read returns {}"
+        self.log.debug(fmt.format(self.name, d))
+        return d
 
+    #def __getattr__(self, name):
+    #    print("Getting name", name)
+    #    return getattr(self.signal_to_proxy, name)
+
+
+class Steerer( PowerConverter ):
+    """Steerer with certain settings
+    """
+    def __init__(self, *args, **kwargs):
+        kwargs.setdefault('settle_time', 0.1)
+        super().__init__(*args, **kwargs)
+
+class _SelectedSteerer( Device ):
+    setpoint = Cpt(SignalProxy, name='set', value = np.nan, kind = 'normal', lazy = False)
+    readback = Cpt(SignalProxy, name='rdbk', value = np.nan, kind = 'hinted', lazy = False)
+
+    def __init__(self, *args, **kwargs):
+        self._selected_steerer = None
+        super().__init__(*args, **kwargs)
+
+    def subscribeSelected(self):
+        self.setpoint.signal_to_proxy = self.selected_steerer.setpoint
+        self.readback.signal_to_proxy = self.selected_steerer.readback
+
+    def unsubscribeSelected(self):
+        if self._selected_steerer is not None:
+            self._selected_steerer = None
+        self.setpoint.remove_proxy_signal()
+        self.readback.remove_proxy_signal()
+
+    @property
+    def selected_steerer(self):
+        sel = self._selected_steerer
+        if sel is None:
+            raise AssertionError('No steerer was selected!')
+
+        self.log.info("Selected steerer {}".format(sel))
+        return sel
+
+    def setSteerer(self, steerer):
+        self.unsubscribeSelected()
+        self._selected_steerer = steerer
+        self.subscribeSelected()
+
+
+    def trigger(self):
+        st_set = self.setpoint.trigger()
+        st_rbk = self.readback.trigger()
+        status = AndStatus(st_set, st_rbk)
+        return status
+
+    def __del__(self):
+        self.unsubscribeSelected()
+
+class SelectedSteerer( Device ):
+    """Pass it through ...
+    """
+    dev = Cpt(_SelectedSteerer, '', #egu='A',
+              #setting_parameters = 0.1,
+              #timeout = 2
+                  )
+
+    def trigger(self):
+        return self.dev.trigger()
 
 class SteererCollection( Device ):
     steerers = DDC(ad_group(Steerer, t_steerers),
@@ -45,43 +141,27 @@ class SteererCollection( Device ):
     )
 
     selected = Cpt(Signal, name='selected', value ='non selected')
-    sel_setpoint = Cpt(SignalHelper, name='sel_setpoint', value = np.nan)
-    sel_readback = Cpt(SignalHelper, name='sel_readback', value = np.nan)
-
+    sel = Cpt(SelectedSteerer, name = 'sel_st')
 
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self._selected_steerer = None
-        self.__logger = logger
-
-    @property
-    def selected_steerer(self):
-        sel = self._selected_steerer
-        if sel is None:
-            raise AssertionError('No steerer was selected!')
-
-        print("Selected steerer {}".format(sel))
-        return sel
-
-    def unsubscribeSelected(self):
-        if self._selected_steerer is not None:
-            sel = self._selected_steerer.dev
-            sel.setpoint.clear_sub(self.sel_setpoint.set_cb)
-            sel.readback.clear_sub(self.sel_readback.set_cb)
-            self._selected_steerer = None
-
-    def __del__(self):
-        self.unsubscribeSelected()
-
-    def subscribeSelected(self):
-        sel = self._selected_steerer.dev
-        sel.setpoint.subscribe(self.sel_setpoint.set_cb)
-        sel.readback.subscribe(self.sel_readback.set_cb)
+        self._setDefaultSteerer()
 
 
-    def setLogger(self, logger):
-        self.__logger = logger
+    def _setDefaultSteerer(self):
+        self._setSteererByName(t_steerers[0][0])
+
+
+    def _setSteererByName(self, name):
+        try:
+            steerer = getattr(self.steerers, name)
+            self.sel.dev.setSteerer(steerer)
+        except Exception as e:
+            fmt = "{}._setSteererByName failed to set steerer {} reason {}"
+            self.log.error(fmt.format(self.name, name, e))
+            raise
+        self.log.info("Selected steerer {}".format(steerer))
 
     def set(self, name):
         """Just to make it easier to run it with bluesky
@@ -89,16 +169,26 @@ class SteererCollection( Device ):
         Args:
             name : steerer name
         """
-
-        self.unsubscribeSelected()
-        steerer = getattr(self.steerers, name)
-        self.__logger.debug("Selected steerer {}".format(steerer))
-        self._selected_steerer = steerer
-
+        self.log.info("Selecting steerer {}".format(name))
+        self._setSteererByName(name)
         status = self.selected.set(name)
+        return status
 
-        def install_cb():
-            self.subscribeSelected()
 
-        status.add_callback(install_cb)
+    def trigger_all_components_update(self):
+        status = None
+        for name in self.steerers.component_names:
+            cpt = getattr(self.steerers, name)
+            sig_rdbk = cpt.readback
+            r = trigger_on_update(sig_rdbk)
+            if status == None:
+                status = r
+            else:
+                status = AndStatus(status, r)
+        return status
+
+    def trigger(self):
+        status = self.sel.trigger()
+        fmt = "{}.trigger: {} "
+        self.log.debug(fmt.format(self.name, status))
         return status
