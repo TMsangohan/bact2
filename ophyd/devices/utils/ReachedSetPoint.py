@@ -1,6 +1,9 @@
 from ophyd import PVPositionerPC
 from ophyd.utils import errors
 from ophyd.status import SubscriptionStatus, Status
+import logging
+
+logger = logging.getLogger()
 
 class OphydInvalidParameter(ValueError, errors.OpException):
     """given parameter was invalid
@@ -56,6 +59,7 @@ class DoneBasedOnReadback(t_super):
 
         super().__init__(*args, **kws)
 
+
         setpar = self._checkSettingParameters(setting_parameters)
         if setpar is None:
             fmt = "%s._checkSettingParameters must return vaild parameters (returned None)"
@@ -69,7 +73,8 @@ class DoneBasedOnReadback(t_super):
 
         # Required to trace the status of the device
         self._moving = None
-        self.__logger = None
+        self.__logger = logger
+
 
     def _checkSetup(self):
         """check that instance contains required variables

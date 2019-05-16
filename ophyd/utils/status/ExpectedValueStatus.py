@@ -1,19 +1,20 @@
 import time
-import threading 
+import threading
 from ophyd.status import  SubscriptionStatus
 
 class ExpectedValueStatus( SubscriptionStatus ):
     """
     Use heuristic to report when next value is expected
     """
-    def __init__(self, *args, **kwargs):
+    def __init__(self, *args, expected_total_time = 2.0, **kwargs):
         """
         Let's see if something is required
         """
-        super().__init__(*args, **kwargs)
+        super().__init__(*args,  **kwargs)
         self._info_thread = None
 
-        self.expected_total_time = 2.0
+        expected_total_time = float(expected_total_time)
+        self.expected_total_time = expected_total_time
 
         if not self.done:
             # print("Subscribing to device {}".format(self.device.name))

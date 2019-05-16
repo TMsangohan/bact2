@@ -126,7 +126,7 @@ class FlickerSignal:
             del device_status
 
         else:
-            self.parent.tac()
+            self.tac()
             fmt = "New data arrived after {}: Expecting other trigger to mark status as done"
             log_debug(fmt.format(self.stored_dt()))
 
