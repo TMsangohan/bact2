@@ -8,12 +8,14 @@ from ..utils import trigger_on_update
 from .steerer_list import horizontal_steerers, vertical_steerers
 import numpy as np
 
+import logging
 logger = logging.getLogger()
 
-
 all_steerers = horizontal_steerers + vertical_steerers
-all_steerers = all_steerers
 t_steerers = [(name.lower(), name) for name in all_steerers]
+
+horizontal_steerer_names = [name.lower() for name in horizontal_steerers]
+vertical_steerer_names   = [name.lower() for name in vertical_steerers]
 
 
 
@@ -46,6 +48,10 @@ class SignalProxy( Signal ):
     def set(self, *args, **kwargs):
         sig = self.signal_to_proxy
         return sig.set(*args, **kwargs)
+
+    def get(self, *args, **kwargs):
+        sig = self.signal_to_proxy
+        return sig.get(*args, **kwargs)
 
     def trigger(self):
         sig = self.signal_to_proxy
@@ -83,7 +89,7 @@ class Steerer( PowerConverter ):
         kwargs.setdefault('settle_time', 0.1)
         super().__init__(*args, **kwargs)
 
-        
+
 class _SelectedSteerer( Device ):
     setpoint = Cpt(SignalProxy, name='set', value = np.nan, kind = 'normal', lazy = False)
     readback = Cpt(SignalProxy, name='rdbk', value = np.nan, kind = 'hinted', lazy = False)
@@ -143,7 +149,7 @@ class SteererCollection( Device ):
               default_read_attrs = (),
     )
 
-    selected = Cpt(Signal, name='selected', value ='non selected')
+    selected = Cpt(Signal, name='selected', value ='none selected', kind='normal')
     sel = Cpt(SelectedSteerer, name = 'sel_st')
 
 

@@ -119,7 +119,7 @@ def main():
                 yield from bps.trigger_and_read(detector)
 
     def loop_steerers(detectors, col, num_readings = 1, md = None,
-                      horizontal_steerers = None, vertical_steerers = None):
+                      horizontal_steerer_names = None, vertical_steerer_names = None):
         """
         """
         col_info = [col.selected.name, col.sel.name]
@@ -132,8 +132,8 @@ def main():
         _md.update(md or {})
 
 
-        assert(horizontal_steerers is not None)
-        assert(vertical_steerers   is not None)
+        assert(horizontal_steerer_names is not None)
+        assert(vertical_steerer_names   is not None)
 
             
         RE.log.info('Starting run_all')
@@ -150,15 +150,13 @@ def main():
 
             currents = current_val_horizontal * current_signs
             
-            for name in horizontal_steerers:
-                name = name.lower()
+            for name in horizontal_steerer_names:
                 RE.log.info('Selecting steerer {}'.format(name))
                 yield from bps.mv(col, name)
                 yield from step_steerer(col.sel.dev, currents, det, num_readings)
                 
             currents = current_val_vertical * current_signs
-            for name in steerers.vertical_steerers[:2]:
-                name = name.lower()
+            for name in vertical_steerer_names:
                 RE.log.info('Selecting steerer {}'.format(name))
                 yield from bps.mv(col, name)
                 yield from step_steerer(col.sel.dev, currents, det, num_readings)
@@ -182,19 +180,20 @@ def main():
     RE.log.info('Starting to execute plan')
     det = [bpm, col.selected, col.sel.dev]
 
-    h_st = steerers.horizontal_steerers
-    v_st = steerers.vertical_steerers
+    h_st = steerers.horizontal_steerer_names
+    v_st = steerers.vertical_steerer_names
+
+    num = 2
 
     try_scan = False
 
-    num = 2
     if try_scan:
         h_st = h_st[:1]
         v_st = v_st[:1]
         num = 1
     
 
-    runs = RE(loop_steerers(det, col, horizontal_steerers = h_st, vertical_steerers = v_st, num_readings = num), plots)
+    runs = RE(loop_steerers(det, col, horizontal_steerer_names = h_st, vertical_steerer_names = v_st, num_readings = num), plots)
     RE.log.info('Executed runs {}'.format(runs))
     serializer.closeServer()
     RE.unsubscribe(s_id)
