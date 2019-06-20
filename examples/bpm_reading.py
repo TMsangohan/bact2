@@ -14,47 +14,15 @@ from bluesky.utils import install_qt_kicker
 
 from ophyd import sim
 
-import sys
-sys.path.append('/home/tmerten/github-repos/')
-# sys.path.append('/net/nfs/srv/MachinePhysics/MachineDevelopment/Mertens/github-repos/')
-sys.path.append('/home/tmerten/gitlab-repos-hzb/suitcase-elasticsearch/')
-
-# from suitcase.elasticsearch import Serializer
-
 from bact2.ophyd.devices.pp.bpm import BPMStorageRing
 import bact2
 import bact2.bluesky.hacks.callbacks
-from bact2.bluesky.hacks.callbacks import LivePlot, AxisWrapper
-
+from bact2.bluesky.live_plot import line_index
 import numpy as np
 
 
-class PlotLineVsIndex(LivePlot):
-    """plot data versus index
-    """
-    def update_caches(self, x, y):
-        ind = np.arange(len(y))
-        self.x_data = ind.tolist()
-        self.y_data = y.tolist()
-
-class BPMLivePlot(PlotLineVsIndex):
-    """Scale plot data
-    """
-    #: scale factor of y data
-    #: mm/ mA
-    scale_dep = 1
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.old_value = None
-
-    def update_caches(self, x, y):
-        # Scale to kHz
-        if self.old_value is None:
-            self.old_value = y
-        dy = y - self.old_value
-        super().update_caches(x, dy)
-
-
+# compatability hacks to debian stable
+compat = False
 
 def main():
     # Repeat the measurement 5 times
@@ -100,16 +68,18 @@ def main():
     fig1 = plt.figure(1)
     ax1 = plt.subplot(211)
     ax2 = plt.subplot(212)
-    ax1 = AxisWrapper(ax1)
-    ax2 = AxisWrapper(ax2)
     fig1 = plt.figure(2)
     ax3 = plt.subplot()
-    ax3 = AxisWrapper(ax3)
+
+    if compat:
+        ax1 = AxisWrapper(ax1)
+        ax2 = AxisWrapper(ax2)
+        ax3 = AxisWrapper(ax3)
     RE(bp.scan_nd(det, sw_freq * repeat),
        [
-           BPMLivePlot("bpm_waveform_pos_x", ax = ax1, legend_keys = ['x']),
-           BPMLivePlot("bpm_waveform_pos_y", ax = ax2, legend_keys = ['y']),
-           PlotLineVsIndex("bpm_waveform_status", ax = ax3, legend_keys = ['stat']),
+           line_index.PlotLineVsIndexOffset("bpm_waveform_pos_x", ax = ax1, legend_keys = ['x']),
+           line_index.PlotLineVsIndexOffset("bpm_waveform_pos_y", ax = ax2, legend_keys = ['y']),
+           line_index.PlotLineVsIndex("bpm_waveform_status", ax = ax3, legend_keys = ['stat']),
        ]
     )
 
