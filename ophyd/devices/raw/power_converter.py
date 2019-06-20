@@ -4,7 +4,7 @@ from ophyd.status import Status, AndStatus, DeviceStatus
 from ..utils import signal_with_validation
 from ..utils.ReachedSetPoint import ReachedSetpoint
 
-class PowerConverter( ReachedSetpoint ):
+class PowerConverter( PVPositionerPC ):
     """A power converter abstraction
 
     Currently only a device checking that the set and read value corresponds
