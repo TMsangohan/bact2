@@ -96,20 +96,12 @@ class FlickerSignal:
         """Just allow for it to arrive!
         """
 
-        def log_debug(txt):
-            tref = time.time() - self._t0
-            txt = "tref {:.2f} ".format(tref) + txt
-            sys.stderr.write(txt + '\n')
-            sys.stderr.flush()
-            if self.__logger:
-                self.__logger.info(txt)
-
         # device_status = self._device_status
         device_status = book_keeping.device_status
         assert(device_status is not None)
         now_count =  self._n_triggered
         fmt = "New data arrived?  counts: expected {} found {} "
-        log_debug(fmt.format(expected_count, now_count))
+        self.__logger.info(fmt.format(expected_count, now_count))
         if now_count == expected_count:
             log_debug("No new data arrived: done cnt {} unscribing!".format(now_count))
             assert(self.signal is not None)
@@ -119,14 +111,14 @@ class FlickerSignal:
             #    self.signal._callbacks
             #    ))
             device_status._finished(success = True)
-            cid = book_keeping.cid
-            assert(cid is not None)
-            self.signal.unsubscribe(cid)
+            # cid = book_keeping.cid
+            # assert(cid is not None)
+            # self.signal.unsubscribe(cid)
             self._device_status = None
             del device_status
 
         else:
-            self.parent.tac()
+            self.tac()
             fmt = "New data arrived after {}: Expecting other trigger to mark status as done"
             log_debug(fmt.format(self.stored_dt()))
 
@@ -184,9 +176,18 @@ class FlickerSignal:
             def __call__(self, *args, **kwargs):
                 self.parent.delay_signal_status(*args, book_keeping = self, **kwargs)
 
-        cb = callback(parent = self, device_status = device_status)
-        cid = self.signal.subscribe(cb,  run = run)
-        cb.cid = cid
+        book_keeping = callback(parent = self, device_status = device_status)
+
+        def cb(*args, **kwargs):
+            nonlocal book_keeping
+            self.delay_signal_status(*args, book_keeping = book_keeping, **kwargs)
+
+        def unsubscribe():
+            nonlocal cb
+            self.signal.clear_sub(cb)
+
+        device_status.add_callback(unsubscirbe)
+        self.signal.subscribe(cb,  run = run)
 
         # print("Subscribers {}".format(self.signal._unwrapped_callbacks))
 
