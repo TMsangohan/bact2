@@ -1,39 +1,33 @@
 import matplotlib
 matplotlib.use("Qt5Agg")
 import matplotlib.pyplot as plt
-from cycler import cycler
 
-import bluesky.plans as bp
-import bluesky.plan_stubs as bps
-from bluesky.utils import ProgressBarManager
-from bluesky.utils import install_qt_kicker
-
+from bluesky.utils import ProgressBarManager, install_qt_kicker
 from bluesky import RunEngine
-import bluesky.callbacks as bc
+from bluesky import plan_stubs as bps, preprocessors as bpp, callbacks as bc
 import bluesky.callbacks.best_effort
 
 
-import bact2
-import bact2.bluesky.hacks.callbacks
-from bact2.bluesky.hacks.callbacks import LivePlot, AxisWrapper
-
 from bact2.ophyd.devices.raw import steerers
-
-import bact2
-import bact2.bluesky.hacks.callbacks
-from bact2.bluesky.hacks.callbacks import LivePlot
 from bact2.ophyd.devices.pp.bpm import BPMStorageRing
+from bact2.bluesky.live_plot import line_index
+
 import numpy as np
 
+import sys
+sys.path.append('/opt/OPI/MachinePhysics/MachineDevelopment/Mertens/github-repos/suitcase-elasticsearch')
+from getpass import getpass
+import elasticsearch
+from sshtunnel import SSHTunnelForwarder
+#from suitcase.elasticsearch import Serializer
 
 def main():
 
+    
     col = steerers.SteererCollection(name = "sc")
-    steerer_names = [t[0] for t in steerers.t_steerers]
-
     bpm = BPMStorageRing(name = "bpm")
-    if not bpm.connected:
-        bpm.wait_for_connection()
+
+    steerer_names = col.steerers.component_names
 
     bec = bc.best_effort.BestEffortCallback()
 
@@ -42,17 +36,9 @@ def main():
     RE.log.setLevel("INFO")
 
 
-
     RE.subscribe(bec)
     install_qt_kicker()
     RE.waiting_hook = ProgressBarManager()
-
-
-
-    currents = (0, 1, -1, 0)
-    current_signs = np.array([0, 1, -1, 0])
-
-    bpm_det = [bpm]
 
 
     # These values are for standard operation mode and require to be checked
@@ -67,33 +53,127 @@ def main():
     ihbm = 0.14/2  #%Nutzeroptik
     ihs  = 0.07/6. #; %14.06.10
 
+    current_val = ihs #/ 10.0
 
-    def step_steerer(steerer):
+    # Currents cycle ... respect hysteresis
+    current_signs = np.array([0, 1, -1, 0])
+    currents = current_val * current_signs    
+
+    det = [bpm]
+
+
+    #--------------------------------------------------
+    # Setting up the plots
+    # Let"s have the actual x and y positions. Furthermore bpm
+    # readings are read more than once. Let's have plots that
+    # show how much these readings vary after the first reading
+    # is made
+    #
+    
+    # The figures for x and y ... on top of each other
+    fig1 = plt.figure(1)
+    ax1 = plt.subplot(211)
+    ax2 = plt.subplot(212)
+    # The stat ... if only would know what it means
+    fig2 = plt.figure(2)
+    ax3 = plt.subplot()
+
+    bpm_x = line_index.PlotLineVsIndexOffset("bpm_waveform_pos_x", ax = ax1, legend_keys = ['x'])
+    bpm_y = line_index.PlotLineVsIndexOffset("bpm_waveform_pos_y", ax = ax2, legend_keys = ['y'])
+    bpm_s = line_index.PlotLineVsIndex("bpm_waveform_status", ax = ax3, legend_keys = ['stat'])
+
+    # The offset plot 
+    fig1_1 = plt.figure(10)
+    ax1_1 = plt.subplot(211)
+    ax1_2 = plt.subplot(212)
+    
+    bpm_x_o = line_index.PlotLineVsIndexOffset("bpm_waveform_pos_x", ax = ax1_1, legend_keys = ['x'])
+    bpm_y_o = line_index.PlotLineVsIndexOffset("bpm_waveform_pos_y", ax = ax1_2, legend_keys = ['y'])
+
+    plots = [bpm_x, bpm_y, bpm_s,  bpm_x_o, bpm_y_o]
+
+    
+    def step_steerer(steerer, detector, num_readings):
+        """
+
+        Todo:
+            
+        """
         nonlocal currents
 
-        #: Todo
-        # check if it is not best implemented using the setpoint
-        current_offset = steerer.readback.get()
-        print(current_offset)
+        # Using setpoint as reference ... assuming that this is the more
+        # accurate value
+        # make sure data are here
+        yield from bps.trigger(steerer.setpoint)
+        current_offset = steerer.setpoint.get()
+        RE.log.info('Using steerer offset {:.5f}'.format(current_offset))
+        
+        for d_current in currents:
+            t_current = d_current + current_offset
+            RE.log.info('Setting steerer to I = {:.5f} = {:.5f} + {:.5f}'.format(t_current, current_offset, d_current))
+            yield from bps.mv(steerer.setpoint, t_current)
 
-        current_val = ihs
-        currents = current_signs * current_val + current_offset
+            # Let's check if the first reading of the bpm is really useful
+            # I guess first reading is too fast!
+            # So first let's clear the offset plots
+            [p.clearOffset() for p in (bpm_x_o, bpm_y_o)]
+            for i in range(num_readings):
+                yield from bps.trigger_and_read(detector)
+    
+    def run_all(detectors, num_readings = 2, md = None):
+        _md = {'detectors': [det.name for det in detectors],
+              'num_readings': num_readings,
+              'plan_args': {'detectors': list(map(repr, detectors)), 'num_readings': num_readings},
+              'plan_name': 'response_matrix',
+              'hints': {}
+        }
+        _md.update(md or {})
 
-        for t_current in currents:
-            yield from bps.mv(steerer, t_current)
-            det = [col.selected, col.selected_steerer.dev.readback] + bpm_det
-            yield from bp.count(det)
 
-    def run_all():
-        for name in steerer_names:
-            yield from bps.mv(col, name)
-            yield from bps.trigger(col.selected_steerer.dev.readback)
-            yield from step_steerer(col.selected_steerer.dev)
+        RE.log.info('Starting run_all')
+        
+        @bpp.stage_decorator(list(det) + [col])
+        @bpp.run_decorator(md=_md)
+        def _run_all():
+            for name in steerer_names:
+                RE.log.info('Selecting steerer {}'.format(name))
+                yield from bps.mv(col, name)
+                yield from step_steerer(col.sel.dev, det, num_readings)
 
-    RE(run_all(),
-       [LivePlot("sc_selected_readback", "sc_selected_setpoint",   ax = None, marker = '.')]
-           )
+        yield from _run_all()
+    
+    bec = bc.best_effort.BestEffortCallback()
+    
 
+    store = False
+    if store:
+        MONGO_HOST = "skylab.acc.bessy.de"
+        MONGO_DB = "StorageRing"
+        login = getpass()
+        pwd = getpass()
+        MONGO_USER = login
+        MONGO_PASS = pwd
+
+        server = SSHTunnelForwarder(
+	    MONGO_HOST,
+	    ssh_username=MONGO_USER,
+	    ssh_password=MONGO_PASS,
+	    remote_bind_address=('0.0.0.0', 9200)
+        )
+
+        # START SSH TUNNEL SERVER
+        server.start()
+
+        serializer = Serializer('localhost',server.local_bind_port)
+        RE.subscribe(serializer)
+       
+
+    pbar = ProgressBarManager()
+    RE.waiting_hook = pbar
+    RE.log.info('Starting to execute plan')
+    RE(run_all(det), plots)
+
+    
 
 
 if __name__ == '__main__':
