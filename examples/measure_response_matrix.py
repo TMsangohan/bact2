@@ -7,15 +7,14 @@ import matplotlib.pyplot as plt
 
 from bluesky.utils import ProgressBarManager, install_qt_kicker
 from bluesky import RunEngine
-from bluesky import plan_stubs as bps, preprocessors as bpp, callbacks as bc
-import bluesky.callbacks.best_effort
+from bluesky.callbacks.best_effort import BestEffortCallback
 
 
 from bact2.ophyd.devices.raw import steerers
 from bact2.ophyd.devices.pp.bpm import BPMStorageRing
 from bact2.bluesky.live_plot import line_index
+from bact2.bluesky.plans.loop_steerers import loop_steerers
 
-import numpy as np
 
 from bact2.suitcase.serializer import Serializer
 
@@ -28,16 +27,7 @@ def main():
     bpm = BPMStorageRing(name = "bpm")
 
 
-    bec = bc.best_effort.BestEffortCallback()
-
-    RE = RunEngine({})
-    #RE.log.setLevel("DEBUG")
-    RE.log.setLevel("INFO")
-
-
-    RE.subscribe(bec)
     install_qt_kicker()
-    RE.waiting_hook = ProgressBarManager()
 
 
     # These values are for standard operation mode and require to be checked
@@ -56,8 +46,6 @@ def main():
     current_val_horizontal = ihs
     current_val_vertical = ivs
 
-    # Currents cycle ... respect hysteresis
-    current_signs = np.array([0, 1, -1, 0])
     #--------------------------------------------------
     # Setting up the plots
     # Let"s have the actual x and y positions. Furthermore bpm
@@ -93,79 +81,13 @@ def main():
     plots = [bpm_x, bpm_y, bpm_s,  bpm_x_o, bpm_y_o]
 
 
-    def step_steerer(steerer, currents, detector, num_readings):
-        """
-
-        Todo:
-
-        """
-        # Using setpoint as reference ... assuming that this is the more
-        # accurate value
-        # make sure data are here
-        yield from bps.trigger(steerer.setpoint)
-        current_offset = steerer.setpoint.get()
-        RE.log.info('Using steerer offset {:.5f}'.format(current_offset))
-
-        for d_current in currents:
-            t_current = d_current + current_offset
-            RE.log.info('Setting steerer to I = {:.5f} = {:.5f} + {:.5f}'.format(t_current, current_offset, d_current))
-            yield from bps.mv(steerer.setpoint, t_current)
-
-            # Let's check if the first reading of the bpm is really useful
-            # I guess first reading is too fast!
-            # So first let's clear the offset plots
-            [p.clearOffset() for p in (bpm_x_o, bpm_y_o)]
-            for i in range(num_readings):
-                yield from bps.trigger_and_read(detector)
-
-    def loop_steerers(detectors, col, num_readings = 1, md = None,
-                      horizontal_steerer_names = None, vertical_steerer_names = None):
-        """
-        """
-        col_info = [col.selected.name, col.sel.name]
-        _md = {'detectors': [det.name for det in detectors] + col_info,
-              'num_readings': num_readings,
-              'plan_args': {'detectors': list(map(repr, detectors)), 'num_readings': num_readings},
-              'plan_name': 'response_matrix',
-              'hints': {}
-        }
-        _md.update(md or {})
+    RE = RunEngine({})
+    #RE.log.setLevel("DEBUG")
+    RE.log.setLevel("INFO")
 
 
-        assert(horizontal_steerer_names is not None)
-        assert(vertical_steerer_names   is not None)
-
-            
-        RE.log.info('Starting run_all')
-
-        @bpp.stage_decorator(list(det) + [col])
-        @bpp.run_decorator(md=_md)
-        def _run_all():
-            """Iterate over vertical and horizontal steerers
-
-            Get 
-            """            
-            # Lets do first the horizontal steerers and afterwards
-            # lets get all vertial steerers
-
-            currents = current_val_horizontal * current_signs
-            
-            for name in horizontal_steerer_names:
-                RE.log.info('Selecting steerer {}'.format(name))
-                yield from bps.mv(col, name)
-                yield from step_steerer(col.sel.dev, currents, det, num_readings)
-                
-            currents = current_val_vertical * current_signs
-            for name in vertical_steerer_names:
-                RE.log.info('Selecting steerer {}'.format(name))
-                yield from bps.mv(col, name)
-                yield from step_steerer(col.sel.dev, currents, det, num_readings)
-
-
-                
-        return (yield from _run_all())
-
-    bec = bc.best_effort.BestEffortCallback()
+    bec = BestEffortCallback()
+    RE.subscribe(bec)
 
     pbar = ProgressBarManager()
     RE.waiting_hook = pbar
@@ -193,7 +115,13 @@ def main():
         num = 1
     
 
-    runs = RE(loop_steerers(det, col, horizontal_steerer_names = h_st, vertical_steerer_names = v_st, num_readings = num), plots)
+    runs = RE(
+        loop_steerers(det, col, horizontal_steerer_names = h_st, vertical_steerer_names = v_st, num_readings = num,
+                      current_val_horizontal = current_val_horizontal, current_val_vertical = current_val_vertical,
+                      bpm_x_o = bpm_x_o, bpm_y_o = bpm_y_o,
+        ),
+        plots
+    )
     RE.log.info('Executed runs {}'.format(runs))
     serializer.closeServer()
     RE.unsubscribe(s_id)
