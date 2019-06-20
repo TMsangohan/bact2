@@ -17,6 +17,7 @@ class Steerer( Device ):
     """
     dev = Cpt(PowerConverter, '', egu='A',
               #setting_parameters = 0.1,
+              settle_time = 1e-2 # 10 ms
               timeout = 2)
 
 
