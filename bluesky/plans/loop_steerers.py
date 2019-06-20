@@ -84,7 +84,7 @@ def loop_steerers(detectors, col, num_readings = 1, md = None,
         for name in vertical_steerer_names:
             logger.info('Selecting steerer {}'.format(name))
             yield from bps.mv(col, name)
-            yield from step_steerer(col.sel.dev, currents, detectors, num_readings)
+            yield from step_steerer(col.sel.dev, currents, detectors, num_readings, **kws)
 
 
     return (yield from _run_all())
