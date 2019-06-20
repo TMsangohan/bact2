@@ -50,16 +50,34 @@ def main():
 
 
     currents = (0, 1, -1, 0)
-    current_vals = np.array([0, 1, -1, 0])
+    current_signs = np.array([0, 1, -1, 0])
 
     bpm_det = [bpm]
+
+
+    # These values are for standard operation mode and require to be checked
+    # steerer current values as found in bessyIIinit
+    # data from bessyIIinit
+    # vertical steerer
+    ivs = 0.07
+
+    # ihbm = 0.14; %Nutzeroptik
+    # ihs  = 0.07/3.;
+
+    ihbm = 0.14/2  #%Nutzeroptik
+    ihs  = 0.07/6. #; %14.06.10
+
 
     def step_steerer(steerer):
         nonlocal currents
 
+        #: Todo
+        # check if it is not best implemented using the setpoint
         current_offset = steerer.readback.get()
         print(current_offset)
-        currents = current_vals * 1e-3 + current_offset
+
+        current_val = ihs
+        currents = current_signs * current_val + current_offset
 
         for t_current in currents:
             yield from bps.mv(steerer, t_current)
