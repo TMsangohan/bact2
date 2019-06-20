@@ -154,7 +154,7 @@ class BPMMeasurementStates:
         self.measurement_state.set_triggered()
         self._counter = None
         self.tic()
-        self.__logger.debug("At {:.3f} s: triggered acquisition ".format(self.dt))
+        self.__logger.info("At {:.3f} s: triggered acquisition ".format(self.dt))
 
     def set_acquire(self):
         """
@@ -163,12 +163,12 @@ class BPMMeasurementStates:
         engine to finished to
         """
         fmt = "At {:.3f} s: setting to acquire mode after "
-        self.__logger.debug(fmt.format(self.dt))
+        self.__logger.info(fmt.format(self.dt))
         self.measurement_state.set_acquire()
 
     def set_validate(self):
-        fmt = "At {:.3f} s: setting to validate mode: measurement took"
-        self.__logger.debug(fmt.format(self.dt))
+        fmt = "At {:.3f} s: setting to validate mode"
+        self.__logger.info(fmt.format(self.dt))
         self.measurement_state.set_validate()
         self.tic()
 
@@ -177,11 +177,11 @@ class BPMMeasurementStates:
 
         Remove the callbacks to the changed values
         """
-        self.__logger.debug("At {:.3f} s: finished acquistion ".format(self.dt))
+        self.__logger.info("At {:.3f} s: finished acquistion ".format(self.dt))
         self.measurement_state.set_finished()
 
     def set_failed(self):
-        self.__logger.debug("Switched to fail state dt = {:.3f}".format(self.dt))
+        self.__logger.warning("Switched to fail state dt = {:.3f}".format(self.dt))
         self.measurement_state.set_failed()
 
     def onValueChange(self, *args, obj = None, **kwargs):
@@ -246,11 +246,11 @@ class BPMMeasurementStates:
         """
         #self.log("on value triggered args {} kwargs {}".format(args, kwargs))
 
-        self.__logger.debug("At {:.3f} s: change triggered by name {}".format(self.dt, name))
+        self.__logger.info("At {:.3f} s: change triggered by name {}".format(self.dt, name))
         if name == "ready":
             ready = kwargs["value"]
             txt = "At {:.3f} s: triggered ready val = {}".format(self.dt, ready)
-            self.__logger.debug(txt)
+            self.__logger.info(txt)
             if not ready:
                 # Waiting for the data!
                 self.set_acquire()
@@ -266,7 +266,7 @@ class BPMMeasurementStates:
         value = kwargs["value"]
         if name == 'ready':
             ready = value
-            self.__logger.debug("At {:.3f} s: acquire ready val = {}".format(self.dt, ready))
+            self.__logger.info("At {:.3f} s: acquire ready val = {}".format(self.dt, ready))
             if ready:
                 self.set_validate()
 
@@ -293,7 +293,7 @@ class BPMMeasurementStates:
             Review if a check should be made if ready falls off to low
         """
         # self.log("on value validate args {} kwargs {}".format(args, kwargs))
-        self.__logger.debug("At {:.3f}: validate {}".format(self.dt, name))
+        self.__logger.info("At {:.3f}: validate {}".format(self.dt, name))
 
 
         value = kwargs["value"]
@@ -397,13 +397,13 @@ class BPMMeasurementStates:
             if n_updates_during_validation != ref_cnt:
                 fmt = "At {:.3f} s: validating: expected {} validation calls but found {} calls."\
                   " Not setting finish"
-                self.__logger.info(fmt.format(self.dt, ref_cnt, n_updates_during_validation))
+                self.__logger.warning(fmt.format(self.dt, ref_cnt, n_updates_during_validation))
                 return
 
             fmt = "At {:.3f} s: finishing at {} validation calls"
             txt = fmt.format(self.dt, ref_cnt)
             if ref_cnt > 1:
-                self.__logger.info(txt)
+                self.__logger.warning(txt)
             # That's necessary. Not known if this callback will end up here again
             clear_callbacks_to_signals()
             self.set_finished()
