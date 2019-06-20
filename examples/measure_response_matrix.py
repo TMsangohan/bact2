@@ -1,3 +1,6 @@
+"""Measure the response matrix
+"""
+
 import matplotlib
 matplotlib.use("Qt5Agg")
 import matplotlib.pyplot as plt
@@ -14,13 +17,7 @@ from bact2.bluesky.live_plot import line_index
 
 import numpy as np
 
-import sys
-import os
-sys.path.append('/opt/OPI/MachinePhysics/MachineDevelopment/mertens/github-repos/suitcase-elasticsearch')
-from getpass import getpass
-import elasticsearch
-from sshtunnel import SSHTunnelForwarder
-from suitcase.elasticsearch import Serializer
+from bact2.suitcase.serializer import Serializer
 
 def main():
     """step all steerers and read the bpms
@@ -30,7 +27,6 @@ def main():
     col = steerers.SteererCollection(name = "sc")
     bpm = BPMStorageRing(name = "bpm")
 
-    steerer_names = col.steerers.component_names
 
     bec = bc.best_effort.BestEffortCallback()
 
@@ -46,6 +42,7 @@ def main():
 
     # These values are for standard operation mode and require to be checked
     # steerer current values as found in bessyIIinit
+
     # data from bessyIIinit
     # vertical steerer
     ivs = 0.07
@@ -56,13 +53,11 @@ def main():
     ihbm = 0.14/2  #%Nutzeroptik
     ihs  = 0.07/6. #; %14.06.10
 
-    current_val = ihs #/ 10.0
+    current_val_horizontal = ihs
+    current_val_vertical = ivs
 
     # Currents cycle ... respect hysteresis
     current_signs = np.array([0, 1, -1, 0])
-    currents = current_val * current_signs
-
-    det = [bpm]
     #--------------------------------------------------
     # Setting up the plots
     # Let"s have the actual x and y positions. Furthermore bpm
@@ -92,20 +87,18 @@ def main():
     ax1_2 = plt.subplot(212)
     ax1_2.grid(True)
 
-    bpm_x_o = line_index.PlotLineVsIndexOffset("bpm_waveform_pos_x", ax = ax1_1, legend_keys = ['x'])
-    bpm_y_o = line_index.PlotLineVsIndexOffset("bpm_waveform_pos_y", ax = ax1_2, legend_keys = ['y'])
+    bpm_x_o = line_index.PlotLineVsIndexOffset("bpm_waveform_pos_x", ax = ax1, legend_keys = ['x'], color = 'c', linestyle = '--')
+    bpm_y_o = line_index.PlotLineVsIndexOffset("bpm_waveform_pos_y", ax = ax2, legend_keys = ['y'], color = 'c', linestyle = '--')
 
     plots = [bpm_x, bpm_y, bpm_s,  bpm_x_o, bpm_y_o]
 
 
-    def step_steerer(steerer, detector, num_readings):
+    def step_steerer(steerer, currents, detector, num_readings):
         """
 
         Todo:
 
         """
-        nonlocal currents
-
         # Using setpoint as reference ... assuming that this is the more
         # accurate value
         # make sure data are here
@@ -125,8 +118,10 @@ def main():
             for i in range(num_readings):
                 yield from bps.trigger_and_read(detector)
 
-    def run_all(detectors, col, num_readings = 2, md = None):
-
+    def loop_steerers(detectors, col, num_readings = 1, md = None,
+                      horizontal_steerers = None, vertical_steerers = None):
+        """
+        """
         col_info = [col.selected.name, col.sel.name]
         _md = {'detectors': [det.name for det in detectors] + col_info,
               'num_readings': num_readings,
@@ -137,68 +132,79 @@ def main():
         _md.update(md or {})
 
 
+        assert(horizontal_steerers is not None)
+        assert(vertical_steerers   is not None)
+
+            
         RE.log.info('Starting run_all')
 
         @bpp.stage_decorator(list(det) + [col])
         @bpp.run_decorator(md=_md)
         def _run_all():
-            for name in steerer_names[:2]:
+            """Iterate over vertical and horizontal steerers
+
+            Get 
+            """            
+            # Lets do first the horizontal steerers and afterwards
+            # lets get all vertial steerers
+
+            currents = current_val_horizontal * current_signs
+            
+            for name in horizontal_steerers:
+                name = name.lower()
                 RE.log.info('Selecting steerer {}'.format(name))
                 yield from bps.mv(col, name)
-                yield from step_steerer(col.sel.dev, det, num_readings)
+                yield from step_steerer(col.sel.dev, currents, det, num_readings)
+                
+            currents = current_val_vertical * current_signs
+            for name in steerers.vertical_steerers[:2]:
+                name = name.lower()
+                RE.log.info('Selecting steerer {}'.format(name))
+                yield from bps.mv(col, name)
+                yield from step_steerer(col.sel.dev, currents, det, num_readings)
 
-        yield from _run_all()
+
+                
+        return (yield from _run_all())
 
     bec = bc.best_effort.BestEffortCallback()
 
     pbar = ProgressBarManager()
     RE.waiting_hook = pbar
 
-    server = None
-    store = True
-    if store:
-        MONGO_HOST = "skylab.acc.bessy.de"
-        MONGO_DB = "StorageRing"
-        #login = getpass()
-        #pwd = getpass()
-        MONGO_USER = os.environ['MONGO_USER']
-        MONGO_PASS = os.environ['MONGO_PASS']
 
-        server = SSHTunnelForwarder(
-	    MONGO_HOST,
-	    ssh_username=MONGO_USER,
-	    ssh_password=MONGO_PASS,
-	    remote_bind_address=('0.0.0.0', 9200)
-        )
-
-        # START SSH TUNNEL SERVER
-        server.start()
-
-        serializer = Serializer('localhost', server.local_bind_port)
-        RE.subscribe(serializer)
+        
+    serializer = Serializer()
+    s_id = RE.subscribe(serializer)
 
 
     
     RE.log.info('Starting to execute plan')
+    det = [bpm, col.selected, col.sel.dev]
+
+    h_st = steerers.horizontal_steerers
+    v_st = steerers.vertical_steerers
+
+    try_scan = False
+
+    num = 2
+    if try_scan:
+        h_st = h_st[:1]
+        v_st = v_st[:1]
+        num = 1
     
-    try:
-        RE(run_all(det, col), plots)
-        plt.ioff()
-        plt.show()
-    finally:
-        RE.log.info('Finished executing plan lets go')
-        if server is not None:
-            RE.log.info('Closing Server: still alive {} ?'.format(server.is_alive))
-            server.close()
-            RE.log.info('Stoping server: still alive {} ?'.format(server.is_alive))
-            server.stop()
-            RE.log.info('Stopped Server: still alive {} ?'.format(server.is_alive))
+
+    runs = RE(loop_steerers(det, col, horizontal_steerers = h_st, vertical_steerers = v_st, num_readings = num), plots)
+    RE.log.info('Executed runs {}'.format(runs))
+    serializer.closeServer()
+    RE.unsubscribe(s_id)
+    del serializer
 
 
 
 
 if __name__ == '__main__':
-    # plt.ion()
+    plt.ion()
     main()
-    # plt.ioff()
-    # plt.show()
+    plt.ioff()
+    plt.show()
