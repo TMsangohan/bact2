@@ -30,21 +30,15 @@ class Beam( beam.Beam ):
 
         t0 = time.time()
 
-        count = 0
         def cb(*args, **kwargs):
-            '''Only the second reading seems to be a valid one?
+            '''Ensure that a new reading arrived
             '''
-            nonlocal t0, count
-            count += 1
+            nonlocal t0
 
             t1 =  kwargs['timestamp']
             dt = t1 - t0
             txt = '{:.3f} Got args {} kwargs {}'.format(dt, args, kwargs)
             self.log.debug(txt)
-            # print(txt)
-
-            if count == 1:
-                return False
             return True
 
         timeout = 3
