@@ -1,31 +1,15 @@
-#Let's test that the epics variables are really available
-import matplotlib
-matplotlib.use('Qt4agg')
-import matplotlib.pyplot as plt
-import time
+'''Enabling logger for logging devices
 
-# import epics
-# import functools
+Bluesky comes with a nicely tweaked logging print. Every device has a logging
+instance. This examples shows how to activate the device logging and intercept
+its methods so that one can see its output
 
-# Select a read only variable which gives a new output every now and then
-# I could use the simulation ones from ophyd. I prefer to use some real 
-# device
-
-# One read only device
-sig_ro = 'TOPUPCC:rdCur'
-
-# A second read only device
-sig_ro2 = 'MCLKHX251C:freq'
-
-
-
-
-
-
+Warning:
+    Currently work in progress. I do not yet fully understand how it works
+'''
 from bluesky import plans as bp, RunEngine
-from bluesky.utils import install_qt_kicker, ProgressBarManager
 from ophyd import Device, Component as Cpt, EpicsSignalRO
-from bluesky.callbacks.best_effort import BestEffortCallback
+
 
 class LogMethodCalls:
     def trigger(self):
@@ -40,14 +24,13 @@ class LogMethodCalls:
         self.log.debug(f'{cls_name} read returned {result}')
         return result
 
-#_oDevice = ophyd.Device
-#class Device(LogMethodCalls, _oDevice):
-#    pass
+_oDevice = Device
+class Device(LogMethodCalls, _oDevice):
+    pass
 
-#_oEpicsSignalRO = ophyd.EpicsSignalRO
-#class EpicsSignalRO(LogMethodCalls, _oEpicsSignalRO):
-#    pass
-
+_oEpicsSignalRO = EpicsSignalRO
+class EpicsSignalRO(LogMethodCalls, _oEpicsSignalRO):
+    pass
 
 
 class ReadonlyDevice(Device):
@@ -55,35 +38,26 @@ class ReadonlyDevice(Device):
     
     This devivce is solely used to describe the methods
     """
-    ro = Cpt(EpicsSignalRO, sig_ro)
+    ro = Cpt(EpicsSignalRO, 'TOPUPCC:rdCur')
 
-# Check that debug print works!
-# logging.basicConfig(level = 'INFO')
-# RE.log.setLevel('DEBUG')
-# ophyd.logger.setLevel('DEBUG')
 
 def main():
     ro_dev = ReadonlyDevice(name = 'sig')
-    #ro_dev.log.addHandler(stream_handler)
-    # ro_dev.log.setLevel('DEBUG')
-
+    
     if not ro_dev.connected:
         ro_dev.wait_for_connection()
 
     RE = RunEngine({})
-    bec = BestEffortCallback()
-    RE.subscribe(bec)
-    RE.waiting_hook = ProgressBarManager()
-    install_qt_kicker()
+    RE.log.setLevel('INFO')
 
-    print(ro_dev.read())
-
+    # Is there a simpler method for that?
+    th = RE.log.parent.handlers[0]
+    
+    ro_dev.log.parent.setLevel('DEBUG')
+    ro_dev.log.parent.addHandler(th)
+    
     detectors = [ro_dev]
     RE(bp.count(detectors, 1))
-
-    del RE
-    del ro_dev
-    print("Finished")
 
 if __name__ == '__main__':
     main()
