@@ -13328,6 +13328,7 @@ a.anchor-link {
 </div><div class="inner_cell">
 <div class="text_cell_render border-box-sizing rendered_html">
 <h1> Introduction to Bluesky and Ophyd </h1><p>Author: Pierre Schnizer</p>
+<p>Material see <a href="https://github.com/TMsangohan/bact2/tree/master/tutorials">https://github.com/TMsangohan/bact2/tree/master/tutorials</a></p>
 
 </div>
 </div>
@@ -13335,7 +13336,7 @@ a.anchor-link {
 <div class="cell border-box-sizing text_cell rendered"><div class="prompt input_prompt">
 </div><div class="inner_cell">
 <div class="text_cell_render border-box-sizing rendered_html">
-<h2> Literature </h2><h3> Python knowledge </h3><ul>
+<h2> Literature  I/II</h2><h3> Python knowledge </h3><ul>
 <li>classes and inheritance</li>
 <li>generators  </li>
 <li>decorators</li>
@@ -13350,7 +13351,7 @@ a.anchor-link {
 <div class="cell border-box-sizing text_cell rendered"><div class="prompt input_prompt">
 </div><div class="inner_cell">
 <div class="text_cell_render border-box-sizing rendered_html">
-<h2> Literature </h2><p><h3> Python </h3>
+<h2> Literature II/II</h2><p><h3> Python </h3>
 The author assumes that the reader is familiar with python language version 3. 
 Bluesky and Ophyd make have use of:</p>
 <ul>
@@ -13367,9 +13368,106 @@ Bluesky and Ophyd make have use of:</p>
 <div class="cell border-box-sizing text_cell rendered"><div class="prompt input_prompt">
 </div><div class="inner_cell">
 <div class="text_cell_render border-box-sizing rendered_html">
-<h3> Abstraction </h3><p>Most of these implementation details are abstracted in an elegant manner. 
-But ocassioally, in particular when debugging 
-a faulty device driver, it can be helpful to be awaare of the general concepts of asynchronous programming.</p>
+<h3>  Data aquisition I/II </h3><ol>
+<li>selection of devices</li>
+<li>configuration of devices</li>
+<li>initalisation of devices</li>
+<li>executing a measurement plan</li>
+<li>take data</li>
+</ol>
+<p>While steps 1--3 are done typically sequentially, these can be executed in parallel.</p>
+<p>For measurements it is typically essential to:</p>
+<ul>
+<li>ensure that some parts are run strictly sequentially (e.g. last steps to measurement setup)</li>
+<li>ensure that some parts are done in parallel.</li>
+</ul>
+<p>Last but not least:</p>
+<ul>
+<li>it is always essential to check that used devices are in an appropriate stage. </li>
+<li>be aware that data is available and used</li>
+</ul>
+
+</div>
+</div>
+</div></section><section>
+<div class="cell border-box-sizing text_cell rendered"><div class="prompt input_prompt">
+</div><div class="inner_cell">
+<div class="text_cell_render border-box-sizing rendered_html">
+<p><h3>  Data acquisition II/II </h3>
+In this series of lectures I assume that a control system is readily available, which allows 
+accessing a lot of devices.</p>
+<p>As it is BESSY II, I will always refer to the environment found here.</p>
+
+</div>
+</div>
+</div><aside class="notes">
+
+<div class="cell border-box-sizing text_cell rendered"><div class="prompt input_prompt">
+</div><div class="inner_cell">
+<div class="text_cell_render border-box-sizing rendered_html">
+<p>If you are at an other lab:</p>
+<ul>
+<li>look for two read only variables you can read from <code>EPICS</code>.</li>
+<li>redefine the variables <code>sig_ro</code> and <code>sig_ro2</code> to their names</li>
+<li>then most examples should work</li>
+</ul>
+
+</div>
+</div>
+</div>
+</aside></section><section>
+<div class="cell border-box-sizing text_cell rendered"><div class="prompt input_prompt">
+</div><div class="inner_cell">
+<div class="text_cell_render border-box-sizing rendered_html">
+<h3> Scope of this lecture </h3>
+</div>
+</div>
+</div><div class="fragment">
+<div class="cell border-box-sizing text_cell rendered"><div class="prompt input_prompt">
+</div><div class="inner_cell">
+<div class="text_cell_render border-box-sizing rendered_html">
+<p>This lecture will focus on describing how to</p>
+<ul>
+<li>general concept of interaction between bluesky and ophyd</li>
+<li>implement (configure) a supported device</li>
+<li>implement a device, which requires functionality to checks that dependencies are met</li>
+<li>give some details, how to debug / log devices that do not seem to work</li>
+<li>extend to some low level details, which should give sufficient insights for devices that need a bit of extra care</li>
+</ul>
+
+</div>
+</div>
+</div></div></section><section>
+<div class="cell border-box-sizing text_cell rendered"><div class="prompt input_prompt">
+</div><div class="inner_cell">
+<div class="text_cell_render border-box-sizing rendered_html">
+<h3> Excursus: Implementing a device (driver) </h3><p>What's the art of implementing a device driver?</p>
+<ul>
+<li>As a thesis superviser from industry put it:<blockquote><p>Pierre the best selling machines have just one button: one to switch it "on" and "off". Everything else they should do themselves.</p>
+</blockquote>
+</li>
+<li>What's my interpretation of this sentence for a device:<ul>
+<li>Try to provide a simple interface to the user!</li>
+<li>Abstract the interface in such a manner, that short comings of the device are at least signaled!</li>
+</ul>
+</li>
+<li>So how to start a device driver implementation:<ul>
+<li>Understand the physical principles of the device</li>
+<li>Understand the principles of data treatment performed by the device</li>
+<li>Learn to talk to it in a manner the device want's to be talked to </li>
+</ul>
+</li>
+</ul>
+
+</div>
+</div>
+</div></section><section>
+<div class="cell border-box-sizing text_cell rendered"><div class="prompt input_prompt">
+</div><div class="inner_cell">
+<div class="text_cell_render border-box-sizing rendered_html">
+<h3> Bluesky / ophyd abstraction </h3><p>Most of these implementation details are abstracted in an elegant manner. 
+But ocassionally, in particular when debugging 
+a faulty device driver, it can be helpful to be aware of the general concepts of asynchronous programming.</p>
 <p>Generators are used by bluesky plans or plan stubs. If plans are used, which are provided by bluesky,
 the user does not need to worry about these details.</p>
 <p>If one wants to implement ophyd device drivers, the concept of classes should be understood.</p>
@@ -13382,11 +13480,11 @@ the user does not need to worry about these details.</p>
 
 </div>
 </div>
-</div></section></section><section><section>
+</div></section><section>
 <div class="cell border-box-sizing text_cell rendered"><div class="prompt input_prompt">
 </div><div class="inner_cell">
 <div class="text_cell_render border-box-sizing rendered_html">
-<h2> General Concepts </h2><p>Bluesky is used with already two meanings:</p>
+<h3> General Concepts </h3><p>Bluesky is used with already two meanings:</p>
 <ul>
 <li>Bluesky collaboration: a set of different modules used to simplify taking data within the EPICS control system environement</li>
 <li>Bluesky as the python module, which provides the RunEngine and plans</li>
@@ -13400,17 +13498,25 @@ as "Bluesky measurement orchestration"</p>
 <div class="cell border-box-sizing text_cell rendered"><div class="prompt input_prompt">
 </div><div class="inner_cell">
 <div class="text_cell_render border-box-sizing rendered_html">
-<h3> Bluesky build up</h3><p>Bluesky collaboration uses the following concpets:</p>
+<h3> Bluesky naming conventions </h3><p>Bluesky collaboration uses the following concpets:</p>
 <ul>
 <li>A control system (EPICS) is responsible for taking data</li>
 <li>This control system provides asynchronos and parallel access to the devices using variables</li>
 <li>It separates device abstraction from measurement plans</li>
 <li><p>In this concept:</p>
 <ul>
-<li>Ophyd allows making devices accessible abstracted as classes with different methods</li>
-<li>Bluesky provides measurement plans and the run engine</li>
-<li>The run engine executes the plans by calling appropriate methods of the involved devices. 
-(This description is a bit imprecise and will be detailed further below)</li>
+<li><code>Ophyd</code> allows making devices accessible abstracted as classes with different methods</li>
+<li><code>Bluesky</code> provides measurement plans and the run engine</li>
+<li><p>The run engine executes the plans by calling appropriate methods of the involved devices. 
+(This description is a bit imprecise and will be detailed further below)</p>
+</li>
+<li><p>Further modules</p>
+<ul>
+<li>data broker: storing data</li>
+<li>suitcase:    storing data (to files)</li>
+<li>Liveplot:    plotting data</li>
+</ul>
+</li>
 </ul>
 </li>
 </ul>
@@ -13443,6 +13549,7 @@ assures that these are accessed in an asynchronous fashion. How this works is de
 <div class="cell border-box-sizing text_cell rendered"><div class="prompt input_prompt">
 </div><div class="inner_cell">
 <div class="text_cell_render border-box-sizing rendered_html">
+<p><h2> Understanding ophyd devices </h2></p>
 <h3> Device driver example </h3><p>Let's look to a simple device driver. For the beginning let's assume we have a read only
 Epics variable with name <code>sig_ro</code>.</p>
 
@@ -13451,7 +13558,7 @@ Epics variable with name <code>sig_ro</code>.</p>
 </div><div class="fragment">
 <div class="cell border-box-sizing code_cell rendered">
 <div class="input">
-<div class="prompt input_prompt">In&nbsp;[8]:</div>
+<div class="prompt input_prompt">In&nbsp;[7]:</div>
 <div class="inner_cell">
     <div class="input_area">
 <div class=" highlight hl-ipython3"><pre><span></span><span class="kn">from</span> <span class="nn">ophyd</span> <span class="k">import</span> <span class="n">Device</span><span class="p">,</span> <span class="n">Component</span> <span class="k">as</span> <span class="n">Cpt</span><span class="p">,</span> <span class="n">EpicsSignalRO</span>
@@ -13483,7 +13590,7 @@ Epics variable with name <code>sig_ro</code>.</p>
 </div><div class="fragment">
 <div class="cell border-box-sizing code_cell rendered">
 <div class="input">
-<div class="prompt input_prompt">In&nbsp;[10]:</div>
+<div class="prompt input_prompt">In&nbsp;[9]:</div>
 <div class="inner_cell">
     <div class="input_area">
 <div class=" highlight hl-ipython3"><pre><span></span><span class="n">RE</span>
@@ -13499,13 +13606,13 @@ Epics variable with name <code>sig_ro</code>.</p>
 
 <div class="output_area">
 
-    <div class="prompt output_prompt">Out[10]:</div>
+    <div class="prompt output_prompt">Out[9]:</div>
 
 
 
 
 <div class="output_text output_subarea output_execute_result">
-<pre>&lt;bluesky.run_engine.RunEngine at 0x7fc45c42a1d0&gt;</pre>
+<pre>&lt;bluesky.run_engine.RunEngine at 0x7f819c166be0&gt;</pre>
 </div>
 
 </div>
@@ -13527,7 +13634,7 @@ Epics variable with name <code>sig_ro</code>.</p>
 </div></div><div class="fragment">
 <div class="cell border-box-sizing code_cell rendered">
 <div class="input">
-<div class="prompt input_prompt">In&nbsp;[11]:</div>
+<div class="prompt input_prompt">In&nbsp;[10]:</div>
 <div class="inner_cell">
     <div class="input_area">
 <div class=" highlight hl-ipython3"><pre><span></span><span class="kn">from</span> <span class="nn">bluesky</span> <span class="k">import</span> <span class="n">RunEngine</span>
@@ -13555,7 +13662,7 @@ Epics variable with name <code>sig_ro</code>.</p>
 </div><div class="fragment">
 <div class="cell border-box-sizing code_cell rendered">
 <div class="input">
-<div class="prompt input_prompt">In&nbsp;[12]:</div>
+<div class="prompt input_prompt">In&nbsp;[11]:</div>
 <div class="inner_cell">
     <div class="input_area">
 <div class=" highlight hl-ipython3"><pre><span></span><span class="kn">from</span> <span class="nn">bluesky</span> <span class="k">import</span> <span class="n">plans</span> <span class="k">as</span> <span class="n">bps</span> 
@@ -13579,13 +13686,13 @@ Epics variable with name <code>sig_ro</code>.</p>
 
 <div class="output_area">
 
-    <div class="prompt output_prompt">Out[12]:</div>
+    <div class="prompt output_prompt">Out[11]:</div>
 
 
 
 
 <div class="output_text output_subarea output_execute_result">
-<pre>(&#39;82518b35-0f0e-484b-b793-08b43913c116&#39;,)</pre>
+<pre>(&#39;3f43408c-37c1-4dc3-a63d-c0d8c5b65710&#39;,)</pre>
 </div>
 
 </div>
@@ -13612,7 +13719,7 @@ Epics variable with name <code>sig_ro</code>.</p>
 </div></div><div class="fragment">
 <div class="cell border-box-sizing code_cell rendered">
 <div class="input">
-<div class="prompt input_prompt">In&nbsp;[13]:</div>
+<div class="prompt input_prompt">In&nbsp;[12]:</div>
 <div class="inner_cell">
     <div class="input_area">
 <div class=" highlight hl-ipython3"><pre><span></span><span class="c1"># Check that debug print works!</span>
@@ -13642,39 +13749,39 @@ Epics variable with name <code>sig_ro</code>.</p>
 
 
 <div class="output_subarea output_stream output_stdout output_text">
-<pre>[I 17:28:43.480 run_engine:821] Executing plan &lt;generator object count at 0x7fc451f10f48&gt;
-[I 17:28:43.481 run_engine:116] Change state on &lt;bluesky.run_engine.RunEngine object at 0x7fc45c42a1d0&gt; from &#39;idle&#39; -&gt; &#39;running&#39;
-[D 17:28:43.482 run_engine:1421] stage: (ReadonlyDevice(prefix=&#39;&#39;, name=&#39;sig&#39;, read_attrs=[&#39;ro&#39;], configuration_attrs=[])), (), {}
-[D 17:28:43.482 run_engine:1421] open_run: (None), (), {&#39;detectors&#39;: [&#39;sig&#39;], &#39;num_points&#39;: 1, &#39;num_intervals&#39;: 0, &#39;plan_args&#39;: {&#39;detectors&#39;: [&#34;ReadonlyDevice(prefix=&#39;&#39;, name=&#39;sig&#39;, read_attrs=[&#39;ro&#39;], configuration_attrs=[])&#34;], &#39;num&#39;: 1}, &#39;plan_name&#39;: &#39;count&#39;, &#39;hints&#39;: {&#39;dimensions&#39;: [((&#39;time&#39;,), &#39;primary&#39;)]}}
-[D 17:28:43.483 run_engine:1631] Emitted RunStart (uid=&#39;7cdde793-221a-4864-8338-cc32ea7cabcf&#39;)
-[D 17:28:43.483 run_engine:1421] checkpoint: (None), (), {}
-[D 17:28:43.484 run_engine:1421] trigger: (ReadonlyDevice(prefix=&#39;&#39;, name=&#39;sig&#39;, read_attrs=[&#39;ro&#39;], configuration_attrs=[])), (), {&#39;group&#39;: &#39;trigger-7f4ba2&#39;}
-[D 17:28:43.484 run_engine:2245] The object ReadonlyDevice(prefix=&#39;&#39;, name=&#39;sig&#39;, read_attrs=[&#39;ro&#39;], configuration_attrs=[]) reports trigger is done with status True.
-[D 17:28:43.484 run_engine:1421] wait: (None), (), {&#39;group&#39;: &#39;trigger-7f4ba2&#39;}
-[D 17:28:43.485 run_engine:1421] create: (None), (), {&#39;name&#39;: &#39;primary&#39;}
-[D 17:28:43.485 run_engine:1421] read: (ReadonlyDevice(prefix=&#39;&#39;, name=&#39;sig&#39;, read_attrs=[&#39;ro&#39;], configuration_attrs=[])), (), {}
-[D 17:28:43.491 run_engine:1421] save: (None), (), {}
-[D 17:28:43.492 run_engine:1946] Emitted Event Descriptor with name &#39;primary&#39; containing data keys dict_keys([&#39;sig_ro&#39;]) (uid=&#39;b54adb30-47ca-49e0-afe8-8dd5edba9263&#39;)
-[D 17:28:43.493 run_engine:1978] Emitted Event with data keys dict_keys([&#39;sig_ro&#39;]) (uid=&#39;b5e628c5-688f-44d8-96dc-0ce27ae23c2e&#39;)
-[D 17:28:43.493 run_engine:1421] close_run: (None), (), {&#39;exit_status&#39;: None, &#39;reason&#39;: None}
-[D 17:28:43.494 run_engine:1663] Stopping run &#39;7cdde793-221a-4864-8338-cc32ea7cabcf&#39;
-[D 17:28:43.494 run_engine:1688] Emitted RunStop (uid=&#39;d650e165-b3b4-40e6-8a2a-42e32c012a4f&#39;)
-[D 17:28:43.495 run_engine:1421] unstage: (ReadonlyDevice(prefix=&#39;&#39;, name=&#39;sig&#39;, read_attrs=[&#39;ro&#39;], configuration_attrs=[])), (), {}
-[I 17:28:43.495 run_engine:116] Change state on &lt;bluesky.run_engine.RunEngine object at 0x7fc45c42a1d0&gt; from &#39;running&#39; -&gt; &#39;idle&#39;
-[I 17:28:43.496 run_engine:1570] Cleaned up from plan &lt;generator object count at 0x7fc451f10f48&gt;
+<pre>[I 14:05:25.546 run_engine:821] Executing plan &lt;generator object count at 0x7f815bd85ed0&gt;
+[I 14:05:25.547 run_engine:116] Change state on &lt;bluesky.run_engine.RunEngine object at 0x7f819c166be0&gt; from &#39;idle&#39; -&gt; &#39;running&#39;
+[D 14:05:25.548 run_engine:1421] stage: (ReadonlyDevice(prefix=&#39;&#39;, name=&#39;sig&#39;, read_attrs=[&#39;ro&#39;], configuration_attrs=[])), (), {}
+[D 14:05:25.549 run_engine:1421] open_run: (None), (), {&#39;detectors&#39;: [&#39;sig&#39;], &#39;num_points&#39;: 1, &#39;num_intervals&#39;: 0, &#39;plan_args&#39;: {&#39;detectors&#39;: [&#34;ReadonlyDevice(prefix=&#39;&#39;, name=&#39;sig&#39;, read_attrs=[&#39;ro&#39;], configuration_attrs=[])&#34;], &#39;num&#39;: 1}, &#39;plan_name&#39;: &#39;count&#39;, &#39;hints&#39;: {&#39;dimensions&#39;: [((&#39;time&#39;,), &#39;primary&#39;)]}}
+[D 14:05:25.550 run_engine:1631] Emitted RunStart (uid=&#39;01e098e7-3316-4f8d-98c1-aabbb51e1d10&#39;)
+[D 14:05:25.551 run_engine:1421] checkpoint: (None), (), {}
+[D 14:05:25.552 run_engine:1421] trigger: (ReadonlyDevice(prefix=&#39;&#39;, name=&#39;sig&#39;, read_attrs=[&#39;ro&#39;], configuration_attrs=[])), (), {&#39;group&#39;: &#39;trigger-173e94&#39;}
+[D 14:05:25.553 run_engine:2245] The object ReadonlyDevice(prefix=&#39;&#39;, name=&#39;sig&#39;, read_attrs=[&#39;ro&#39;], configuration_attrs=[]) reports trigger is done with status True.
+[D 14:05:25.554 run_engine:1421] wait: (None), (), {&#39;group&#39;: &#39;trigger-173e94&#39;}
+[D 14:05:25.554 run_engine:1421] create: (None), (), {&#39;name&#39;: &#39;primary&#39;}
+[D 14:05:25.555 run_engine:1421] read: (ReadonlyDevice(prefix=&#39;&#39;, name=&#39;sig&#39;, read_attrs=[&#39;ro&#39;], configuration_attrs=[])), (), {}
+[D 14:05:25.557 run_engine:1421] save: (None), (), {}
+[D 14:05:25.558 run_engine:1946] Emitted Event Descriptor with name &#39;primary&#39; containing data keys dict_keys([&#39;sig_ro&#39;]) (uid=&#39;336a5910-ed81-413e-9e1d-ece78d8b56a7&#39;)
+[D 14:05:25.559 run_engine:1978] Emitted Event with data keys dict_keys([&#39;sig_ro&#39;]) (uid=&#39;1fc553f7-80e6-431e-8953-d0a748b06f03&#39;)
+[D 14:05:25.559 run_engine:1421] close_run: (None), (), {&#39;exit_status&#39;: None, &#39;reason&#39;: None}
+[D 14:05:25.559 run_engine:1663] Stopping run &#39;01e098e7-3316-4f8d-98c1-aabbb51e1d10&#39;
+[D 14:05:25.560 run_engine:1688] Emitted RunStop (uid=&#39;6d2ba54b-9cc2-496d-aead-f764fdf34893&#39;)
+[D 14:05:25.560 run_engine:1421] unstage: (ReadonlyDevice(prefix=&#39;&#39;, name=&#39;sig&#39;, read_attrs=[&#39;ro&#39;], configuration_attrs=[])), (), {}
+[I 14:05:25.561 run_engine:116] Change state on &lt;bluesky.run_engine.RunEngine object at 0x7f819c166be0&gt; from &#39;running&#39; -&gt; &#39;idle&#39;
+[I 14:05:25.561 run_engine:1570] Cleaned up from plan &lt;generator object count at 0x7f815bd85ed0&gt;
 </pre>
 </div>
 </div>
 
 <div class="output_area">
 
-    <div class="prompt output_prompt">Out[13]:</div>
+    <div class="prompt output_prompt">Out[12]:</div>
 
 
 
 
 <div class="output_text output_subarea output_execute_result">
-<pre>(&#39;7cdde793-221a-4864-8338-cc32ea7cabcf&#39;,)</pre>
+<pre>(&#39;01e098e7-3316-4f8d-98c1-aabbb51e1d10&#39;,)</pre>
 </div>
 
 </div>
@@ -13686,21 +13793,33 @@ Epics variable with name <code>sig_ro</code>.</p>
 <div class="cell border-box-sizing text_cell rendered"><div class="prompt input_prompt">
 </div><div class="inner_cell">
 <div class="text_cell_render border-box-sizing rendered_html">
-<p>Now let's look to the output. There is quite some output being presented. 
-What is happending? Let's look under the hood:</p>
+<ul>
+<li><p>Lenghty output above: a more focused output below</p>
+</li>
+<li><p>Standard debug output of <code>bluesky.RunEngine</code></p>
+</li>
+<li><p>Interesting here</p>
 <ul>
 <li>There is a call to trigger made</li>
 <li>There is a call to read</li>
 </ul>
-<p>So what's the difference?</p>
+</li>
+<li><p>So what's the difference?</p>
 <ul>
 <li>The method trigger is allowed to take time (but not significant computation time!) </li>
 <li>The method read is used to retrieve the data</li>
 </ul>
-<p>What are the two methods doing (using the :class:<code>ophyd.Device</code>):</p>
+</li>
+<li><p>What are the two methods doing (using the :class:<code>ophyd.Device</code>):</p>
 <ul>
-<li>The method "trigger" triggers a device and waits for it to deliver data</li>
-<li>The method "read" reads actually the data</li>
+<li><p>The method <code>trigger</code> triggers a device and waits for it to be ready to deliver data.
+As soon as trigger signals finish with sucess, it is assumed that a subsequent
+call to read returns immediately.</p>
+</li>
+<li><p>The method <code>read</code> reads actually the data.</p>
+</li>
+</ul>
+</li>
 </ul>
 <p><strong>NB</strong> who to actually trigger a device is shown further down</p>
 <p>Let's intercept the methods to get a better understanding</p>
@@ -13730,7 +13849,7 @@ What is happending? Let's look under the hood:</p>
 </div><div class="fragment">
 <div class="cell border-box-sizing code_cell rendered">
 <div class="input">
-<div class="prompt input_prompt">In&nbsp;[14]:</div>
+<div class="prompt input_prompt">In&nbsp;[13]:</div>
 <div class="inner_cell">
     <div class="input_area">
 <div class=" highlight hl-ipython3"><pre><span></span><span class="kn">from</span> <span class="nn">ophyd</span> <span class="k">import</span> <span class="n">Component</span> <span class="k">as</span> <span class="n">Cpt</span><span class="p">,</span> <span class="n">Device</span> <span class="k">as</span> <span class="n">_oDevice</span><span class="p">,</span> <span class="n">EpicsSignalRO</span> <span class="k">as</span> <span class="n">_oEpicsSignalRO</span>
@@ -13765,8 +13884,9 @@ What is happending? Let's look under the hood:</p>
 </div><div class="inner_cell">
 <div class="text_cell_render border-box-sizing rendered_html">
 <h4> Device logging </h4><ul>
-<li>With the fragment above the code only requires to be executed again</li>
-<li><strong>NB</strong> please take care that 'Device' and 'EpicsSignalRO' are not imported from 'ophyd'</li>
+<li>With the fragment above device only requires to be reinstantiated</li>
+<li><strong>NB</strong> please take care that 'Device' and 'EpicsSignalRO' are not imported again from 'ophyd'</li>
+<li><strong>NB</strong> still some setup required to activate logging records handling</li>
 </ul>
 
 </div>
@@ -13774,7 +13894,7 @@ What is happending? Let's look under the hood:</p>
 </div><div class="fragment">
 <div class="cell border-box-sizing code_cell rendered">
 <div class="input">
-<div class="prompt input_prompt">In&nbsp;[15]:</div>
+<div class="prompt input_prompt">In&nbsp;[14]:</div>
 <div class="inner_cell">
     <div class="input_area">
 <div class=" highlight hl-ipython3"><pre><span></span><span class="k">class</span> <span class="nc">ReadonlyDevice</span><span class="p">(</span><span class="n">Device</span><span class="p">):</span>
@@ -13808,7 +13928,7 @@ What is happending? Let's look under the hood:</p>
 </div><div class="fragment">
 <div class="cell border-box-sizing code_cell rendered">
 <div class="input">
-<div class="prompt input_prompt">In&nbsp;[16]:</div>
+<div class="prompt input_prompt">In&nbsp;[15]:</div>
 <div class="inner_cell">
     <div class="input_area">
 <div class=" highlight hl-ipython3"><pre><span></span><span class="n">ro_dev</span> <span class="o">=</span> <span class="n">ReadonlyDevice</span><span class="p">(</span><span class="n">name</span> <span class="o">=</span> <span class="s1">&#39;sig&#39;</span><span class="p">)</span>
@@ -13825,7 +13945,7 @@ What is happending? Let's look under the hood:</p>
 <p>Install the appropriate handler</p>
 <ul>
 <li>select bluesky handler</li>
-<li>register it with (the parent) of the device logger</li>
+<li><strong>register it with (the parent) of the device logger</strong></li>
 </ul>
 
 </div>
@@ -13833,7 +13953,7 @@ What is happending? Let's look under the hood:</p>
 </div></div><div class="fragment">
 <div class="cell border-box-sizing code_cell rendered">
 <div class="input">
-<div class="prompt input_prompt">In&nbsp;[17]:</div>
+<div class="prompt input_prompt">In&nbsp;[16]:</div>
 <div class="inner_cell">
     <div class="input_area">
 <div class=" highlight hl-ipython3"><pre><span></span><span class="n">bp_re_log</span> <span class="o">=</span> <span class="n">RE</span><span class="o">.</span><span class="n">log</span><span class="o">.</span><span class="n">parent</span><span class="o">.</span><span class="n">handlers</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
@@ -13855,7 +13975,7 @@ What is happending? Let's look under the hood:</p>
 </div><div class="fragment">
 <div class="cell border-box-sizing code_cell rendered">
 <div class="input">
-<div class="prompt input_prompt">In&nbsp;[18]:</div>
+<div class="prompt input_prompt">In&nbsp;[17]:</div>
 <div class="inner_cell">
     <div class="input_area">
 <div class=" highlight hl-ipython3"><pre><span></span><span class="n">RE</span><span class="o">.</span><span class="n">log</span><span class="o">.</span><span class="n">setLevel</span><span class="p">(</span><span class="s1">&#39;WARNING&#39;</span><span class="p">)</span>
@@ -13877,7 +13997,7 @@ What is happending? Let's look under the hood:</p>
 </div><div class="fragment">
 <div class="cell border-box-sizing code_cell rendered">
 <div class="input">
-<div class="prompt input_prompt">In&nbsp;[19]:</div>
+<div class="prompt input_prompt">In&nbsp;[18]:</div>
 <div class="inner_cell">
     <div class="input_area">
 <div class=" highlight hl-ipython3"><pre><span></span><span class="k">if</span> <span class="ow">not</span> <span class="n">ro_dev</span><span class="o">.</span><span class="n">connected</span><span class="p">:</span>
@@ -13901,24 +14021,24 @@ What is happending? Let's look under the hood:</p>
 
 
 <div class="output_subarea output_stream output_stdout output_text">
-<pre>[D 17:28:43.524 device:520] Staging sig
-[D 17:28:43.525 &lt;ipython-input-14-7b7f6cdf7089&gt;:7] ReadonlyDevice method trigger returned DeviceStatus(device=sig, done=True, success=True)
-[D 17:28:43.529 &lt;ipython-input-14-7b7f6cdf7089&gt;:14] EpicsSignalRO method read returned {&#39;sig_ro&#39;: {&#39;value&#39;: 0.0, &#39;timestamp&#39;: 1566919723.50771}}
-[D 17:28:43.529 &lt;ipython-input-14-7b7f6cdf7089&gt;:14] ReadonlyDevice method read returned OrderedDict([(&#39;sig_ro&#39;, {&#39;value&#39;: 0.0, &#39;timestamp&#39;: 1566919723.50771})])
-[D 17:28:43.531 device:586] Unstaging sig
+<pre>[D 14:05:25.639 device:520] Staging sig
+[D 14:05:25.641 &lt;ipython-input-13-7b7f6cdf7089&gt;:7] ReadonlyDevice method trigger returned DeviceStatus(device=sig, done=True, success=True)
+[D 14:05:25.644 &lt;ipython-input-13-7b7f6cdf7089&gt;:14] EpicsSignalRO method read returned {&#39;sig_ro&#39;: {&#39;value&#39;: 0.0, &#39;timestamp&#39;: 1567080325.497173}}
+[D 14:05:25.644 &lt;ipython-input-13-7b7f6cdf7089&gt;:14] ReadonlyDevice method read returned OrderedDict([(&#39;sig_ro&#39;, {&#39;value&#39;: 0.0, &#39;timestamp&#39;: 1567080325.497173})])
+[D 14:05:25.646 device:586] Unstaging sig
 </pre>
 </div>
 </div>
 
 <div class="output_area">
 
-    <div class="prompt output_prompt">Out[19]:</div>
+    <div class="prompt output_prompt">Out[18]:</div>
 
 
 
 
 <div class="output_text output_subarea output_execute_result">
-<pre>(&#39;a66c4842-20ac-40c3-9c41-5c1db3d1ca71&#39;,)</pre>
+<pre>(&#39;a9804135-465c-4fec-9e7f-324816c25d9c&#39;,)</pre>
 </div>
 
 </div>
@@ -13930,7 +14050,7 @@ What is happending? Let's look under the hood:</p>
 <div class="cell border-box-sizing text_cell rendered"><div class="prompt input_prompt">
 </div><div class="inner_cell">
 <div class="text_cell_render border-box-sizing rendered_html">
-<h4> Logging Summary </h4><ul>
+<h4> Logging Summary I/II </h4><ul>
 <li>See full code below</li>
 <li><strong>NB</strong> the code is reordered</li>
 <li>target: logging output only where required    </li>
@@ -13941,7 +14061,7 @@ What is happending? Let's look under the hood:</p>
 </div><div class="fragment">
 <div class="cell border-box-sizing code_cell rendered">
 <div class="input">
-<div class="prompt input_prompt">In&nbsp;[20]:</div>
+<div class="prompt input_prompt">In&nbsp;[19]:</div>
 <div class="inner_cell">
     <div class="input_area">
 <div class=" highlight hl-ipython3"><pre><span></span><span class="n">ro_dev</span> <span class="o">=</span> <span class="n">ReadonlyDevice</span><span class="p">(</span><span class="n">name</span> <span class="o">=</span> <span class="s1">&#39;sig&#39;</span><span class="p">)</span>
@@ -13972,24 +14092,24 @@ What is happending? Let's look under the hood:</p>
 
 
 <div class="output_subarea output_stream output_stdout output_text">
-<pre>[D 17:28:43.591 device:520] Staging sig
-[D 17:28:43.592 &lt;ipython-input-14-7b7f6cdf7089&gt;:7] ReadonlyDevice method trigger returned DeviceStatus(device=sig, done=True, success=True)
-[D 17:28:43.595 &lt;ipython-input-14-7b7f6cdf7089&gt;:14] EpicsSignalRO method read returned {&#39;sig_ro&#39;: {&#39;value&#39;: 0.0, &#39;timestamp&#39;: 1566919723.50771}}
-[D 17:28:43.596 &lt;ipython-input-14-7b7f6cdf7089&gt;:14] ReadonlyDevice method read returned OrderedDict([(&#39;sig_ro&#39;, {&#39;value&#39;: 0.0, &#39;timestamp&#39;: 1566919723.50771})])
-[D 17:28:43.597 device:586] Unstaging sig
+<pre>[D 14:05:25.704 device:520] Staging sig
+[D 14:05:25.705 &lt;ipython-input-13-7b7f6cdf7089&gt;:7] ReadonlyDevice method trigger returned DeviceStatus(device=sig, done=True, success=True)
+[D 14:05:25.708 &lt;ipython-input-13-7b7f6cdf7089&gt;:14] EpicsSignalRO method read returned {&#39;sig_ro&#39;: {&#39;value&#39;: 0.0, &#39;timestamp&#39;: 1567080325.497173}}
+[D 14:05:25.709 &lt;ipython-input-13-7b7f6cdf7089&gt;:14] ReadonlyDevice method read returned OrderedDict([(&#39;sig_ro&#39;, {&#39;value&#39;: 0.0, &#39;timestamp&#39;: 1567080325.497173})])
+[D 14:05:25.710 device:586] Unstaging sig
 </pre>
 </div>
 </div>
 
 <div class="output_area">
 
-    <div class="prompt output_prompt">Out[20]:</div>
+    <div class="prompt output_prompt">Out[19]:</div>
 
 
 
 
 <div class="output_text output_subarea output_execute_result">
-<pre>(&#39;afb3ae90-0d76-4a27-a4c9-9a62538277bb&#39;,)</pre>
+<pre>(&#39;61d0587f-1d6a-44db-aed4-6b850ca91676&#39;,)</pre>
 </div>
 
 </div>
@@ -13997,7 +14117,20 @@ What is happending? Let's look under the hood:</p>
 </div>
 </div>
 
-</div></div></section></section><section><section>
+</div></div></section><section>
+<div class="cell border-box-sizing text_cell rendered"><div class="prompt input_prompt">
+</div><div class="inner_cell">
+<div class="text_cell_render border-box-sizing rendered_html">
+<h4> Logging Summary II/II </h4><p>If code above does not work:</p>
+<ul>
+<li>use the <code>logging</code> module</li>
+<li>set the appropriate logging level using <code>logging.basicConfig</code></li>
+<li><strong>NB</strong> last resort: set logging level before you first import ophyd or bluesky (or libraries that use it)</li>
+</ul>
+
+</div>
+</div>
+</div></section></section><section><section>
 <div class="cell border-box-sizing text_cell rendered"><div class="prompt input_prompt">
 </div><div class="inner_cell">
 <div class="text_cell_render border-box-sizing rendered_html">
@@ -14009,7 +14142,7 @@ What is happending? Let's look under the hood:</p>
 <div class="cell border-box-sizing text_cell rendered"><div class="prompt input_prompt">
 </div><div class="inner_cell">
 <div class="text_cell_render border-box-sizing rendered_html">
-<p>Now we see a difference:</p>
+<p>Now direct output:</p>
 <ul>
 <li>trigger returns a status object</li>
 <li>while read returns data</li>
@@ -14017,7 +14150,7 @@ What is happending? Let's look under the hood:</p>
 <p>What's a status object:</p>
 <ul>
 <li>a delayed return value</li>
-<li>think of the tokens you get in self service restaurants: they buzz as soon as your order is finished</li>
+<li>think of the <code>buzzers</code> you get in self service restaurants: theses <code>buzz</code> as soon as your order is finished</li>
 </ul>
 <p>This is the general concept of ophyd and bluesky:</p>
 <ul>
@@ -14025,8 +14158,6 @@ What is happending? Let's look under the hood:</p>
 <li>methods returning status objects are allowed responding with some delay.
 (but not to take computation. How to do that is detailed furhter down)</li>
 </ul>
-<p>What'S the status object: well think of the new resteraunts that give you a token when you order: 
-the token rings as soon as you are finished.</p>
 <p>I'll detail that in an other example:</p>
 
 </div>
@@ -14034,64 +14165,7 @@ the token rings as soon as you are finished.</p>
 </div></section><section>
 <div class="cell border-box-sizing code_cell rendered">
 <div class="input">
-<div class="prompt input_prompt">In&nbsp;[21]:</div>
-<div class="inner_cell">
-    <div class="input_area">
-<div class=" highlight hl-ipython3"><pre><span></span><span class="n">ro_dev</span> <span class="o">=</span> <span class="n">ReadonlyDevice</span><span class="p">(</span><span class="n">name</span> <span class="o">=</span> <span class="s1">&#39;sig&#39;</span><span class="p">)</span>
-
-<span class="c1"># Yes that is a hack </span>
-<span class="c1"># But there are other methods to get it better organised</span>
-<span class="k">if</span> <span class="ow">not</span> <span class="n">ro_dev</span><span class="o">.</span><span class="n">connected</span><span class="p">:</span>
-    <span class="n">ro_dev</span><span class="o">.</span><span class="n">wait_for_connection</span><span class="p">()</span>
-
-<span class="c1"># ro_dev.log.setLevel(&#39;DEBUG&#39;)</span>
-<span class="n">detectors</span> <span class="o">=</span> <span class="p">[</span><span class="n">ro_dev</span><span class="p">]</span>
-<span class="n">RE</span><span class="p">(</span><span class="n">bps</span><span class="o">.</span><span class="n">count</span><span class="p">(</span><span class="n">detectors</span><span class="p">,</span> <span class="mi">1</span><span class="p">))</span>
-</pre></div>
-
-    </div>
-</div>
-</div>
-
-<div class="output_wrapper">
-<div class="output">
-
-
-<div class="output_area">
-
-    <div class="prompt"></div>
-
-
-<div class="output_subarea output_stream output_stdout output_text">
-<pre>[D 17:28:43.654 device:520] Staging sig
-[D 17:28:43.655 &lt;ipython-input-14-7b7f6cdf7089&gt;:7] ReadonlyDevice method trigger returned DeviceStatus(device=sig, done=True, success=True)
-[D 17:28:43.657 &lt;ipython-input-14-7b7f6cdf7089&gt;:14] EpicsSignalRO method read returned {&#39;sig_ro&#39;: {&#39;value&#39;: 0.0, &#39;timestamp&#39;: 1566919723.50771}}
-[D 17:28:43.658 &lt;ipython-input-14-7b7f6cdf7089&gt;:14] ReadonlyDevice method read returned OrderedDict([(&#39;sig_ro&#39;, {&#39;value&#39;: 0.0, &#39;timestamp&#39;: 1566919723.50771})])
-[D 17:28:43.660 device:586] Unstaging sig
-</pre>
-</div>
-</div>
-
-<div class="output_area">
-
-    <div class="prompt output_prompt">Out[21]:</div>
-
-
-
-
-<div class="output_text output_subarea output_execute_result">
-<pre>(&#39;d81891eb-c76b-4354-a64f-04e7abe3cd5d&#39;,)</pre>
-</div>
-
-</div>
-
-</div>
-</div>
-
-</div></section><section>
-<div class="cell border-box-sizing code_cell rendered">
-<div class="input">
-<div class="prompt input_prompt">In&nbsp;[22]:</div>
+<div class="prompt input_prompt">In&nbsp;[20]:</div>
 <div class="inner_cell">
     <div class="input_area">
 <div class=" highlight hl-ipython3"><pre><span></span><span class="kn">from</span> <span class="nn">ophyd.status</span> <span class="k">import</span> <span class="n">DeviceStatus</span>
@@ -14142,19 +14216,24 @@ the token rings as soon as you are finished.</p>
 <li>The run engine will call trigger on the method  of this object</li>
 <li>it will recieve a status object. </li>
 </ul>
-<p>The run eninge will take the status object and wait for it to complete. If different devices are to be checked it 
+<p>The run engine will take the status object and wait for it to complete. If different devices are to be checked it 
 will wait that the last one has completed. In this manner it ensures that the different variables are handled in 
 parallel.</p>
-<p>Please note: typically this code uses epics.PV. Thus this approach is not suitable for a large set of variables!</p>
-<p>This code can be further simplified if we use SubscriptionStatus instead of device status. Let's implement 
-the smae code again</p>
+<p>Please note:</p>
+<ul>
+<li>typically <code>ophyd</code> uses <code>epics.PV</code> as backend. </li>
+<li>Thus this approach is not suitable for a large set of variables. </li>
+<li>Solution: gather signals and use <code>epics.ca</code></li>
+</ul>
+<p>This code can be further simplified if we use <code>SubscriptionStatus</code> instead of device status. Let's implement 
+the same device again:</p>
 
 </div>
 </div>
 </div></section><section>
 <div class="cell border-box-sizing code_cell rendered">
 <div class="input">
-<div class="prompt input_prompt">In&nbsp;[23]:</div>
+<div class="prompt input_prompt">In&nbsp;[21]:</div>
 <div class="inner_cell">
     <div class="input_area">
 <div class=" highlight hl-ipython3"><pre><span></span><span class="kn">from</span> <span class="nn">ophyd.status</span> <span class="k">import</span> <span class="n">SubscriptionStatus</span>
@@ -14189,7 +14268,7 @@ the smae code again</p>
 </div></section><section>
 <div class="cell border-box-sizing code_cell rendered">
 <div class="input">
-<div class="prompt input_prompt">In&nbsp;[24]:</div>
+<div class="prompt input_prompt">In&nbsp;[22]:</div>
 <div class="inner_cell">
     <div class="input_area">
 <div class=" highlight hl-ipython3"><pre><span></span><span class="n">ro_dev</span> <span class="o">=</span> <span class="n">ReadonlyDevice</span><span class="p">(</span><span class="n">name</span> <span class="o">=</span> <span class="s1">&#39;sig&#39;</span><span class="p">)</span>
@@ -14215,26 +14294,26 @@ the smae code again</p>
 
 
 <div class="output_subarea output_stream output_stdout output_text">
-<pre>[D 17:28:43.686 ophydobj:187] This is the first instance of OphydObject. name={self.name}, id={id(self)}
-[D 17:28:43.738 device:520] Staging sig
-[D 17:28:43.748 &lt;ipython-input-23-d985b3628c31&gt;:19] cb &lt;function ReadonlyDevice.trigger.&lt;locals&gt;.cb at 0x7fc4517526a8&gt;: value = 0.0 old value None timestamp 1566919723.50771
+<pre>[D 14:05:25.732 ophydobj:187] This is the first instance of OphydObject. name={self.name}, id={id(self)}
+[D 14:05:25.784 device:520] Staging sig
+[D 14:05:25.799 &lt;ipython-input-21-d985b3628c31&gt;:19] cb &lt;function ReadonlyDevice.trigger.&lt;locals&gt;.cb at 0x7f815bcda7b8&gt;: value = 0.0 old value 0.0 timestamp 1567080325.497173
     
-[D 17:28:43.749 &lt;ipython-input-14-7b7f6cdf7089&gt;:14] EpicsSignalRO method read returned {&#39;sig_ro&#39;: {&#39;value&#39;: 0.0, &#39;timestamp&#39;: 1566919723.50771}}
-[D 17:28:43.750 &lt;ipython-input-14-7b7f6cdf7089&gt;:14] ReadonlyDevice method read returned OrderedDict([(&#39;sig_ro&#39;, {&#39;value&#39;: 0.0, &#39;timestamp&#39;: 1566919723.50771})])
-[D 17:28:43.751 device:586] Unstaging sig
+[D 14:05:25.800 &lt;ipython-input-13-7b7f6cdf7089&gt;:14] EpicsSignalRO method read returned {&#39;sig_ro&#39;: {&#39;value&#39;: 0.0, &#39;timestamp&#39;: 1567080325.497173}}
+[D 14:05:25.800 &lt;ipython-input-13-7b7f6cdf7089&gt;:14] ReadonlyDevice method read returned OrderedDict([(&#39;sig_ro&#39;, {&#39;value&#39;: 0.0, &#39;timestamp&#39;: 1567080325.497173})])
+[D 14:05:25.802 device:586] Unstaging sig
 </pre>
 </div>
 </div>
 
 <div class="output_area">
 
-    <div class="prompt output_prompt">Out[24]:</div>
+    <div class="prompt output_prompt">Out[22]:</div>
 
 
 
 
 <div class="output_text output_subarea output_execute_result">
-<pre>(&#39;050a63ed-cc59-45a4-98d3-cdc80ec7a3bd&#39;,)</pre>
+<pre>(&#39;e33c2a3a-409b-47e6-aeaf-c0e2641141b5&#39;,)</pre>
 </div>
 
 </div>
@@ -14252,7 +14331,7 @@ Then the callback 'cb' is called every time when new data arrrive at signal self
 <p>The keyword argument run=False, ensures that the method is only called the first time when  new data is arrived.
 It defaults to True. In this case it will be run immediately after the callback 'cb' has been subscribed 
 to the device.</p>
-<p>Please note again, that all these triggers are expected to behave well. IF you need to wait or to do processing,
+<p>Please note again, that all these triggers are expected to behave well. If you need to wait or to do processing,
 see further down how to do that</p>
 
 </div>
@@ -14261,14 +14340,17 @@ see further down how to do that</p>
 <div class="cell border-box-sizing text_cell rendered"><div class="prompt input_prompt">
 </div><div class="inner_cell">
 <div class="text_cell_render border-box-sizing rendered_html">
-<p>Now we have used a very simple device Now let's see if we have a device with two signals</p>
+<h3> A fancier device: two signals </h3><ul>
+<li>Up to now simple device: 1 signal</li>
+<li>Now let's see if we have a device with <strong>two</strong> signals</li>
+</ul>
 
 </div>
 </div>
-</div></section><section>
+</div><div class="fragment">
 <div class="cell border-box-sizing code_cell rendered">
 <div class="input">
-<div class="prompt input_prompt">In&nbsp;[25]:</div>
+<div class="prompt input_prompt">In&nbsp;[23]:</div>
 <div class="inner_cell">
     <div class="input_area">
 <div class=" highlight hl-ipython3"><pre><span></span><span class="k">class</span> <span class="nc">ReadonlyDevice</span><span class="p">(</span><span class="n">Device</span><span class="p">):</span>
@@ -14283,7 +14365,7 @@ see further down how to do that</p>
 </div>
 </div>
 
-</div></section><section>
+</div></div></section><section>
 <div class="cell border-box-sizing text_cell rendered"><div class="prompt input_prompt">
 </div><div class="inner_cell">
 <div class="text_cell_render border-box-sizing rendered_html">
@@ -14294,7 +14376,7 @@ see further down how to do that</p>
 </div></section><section>
 <div class="cell border-box-sizing code_cell rendered">
 <div class="input">
-<div class="prompt input_prompt">In&nbsp;[26]:</div>
+<div class="prompt input_prompt">In&nbsp;[24]:</div>
 <div class="inner_cell">
     <div class="input_area">
 <div class=" highlight hl-ipython3"><pre><span></span><span class="kn">from</span> <span class="nn">bluesky</span> <span class="k">import</span> <span class="n">plans</span> <span class="k">as</span> <span class="n">bps</span><span class="p">,</span> <span class="n">RunEngine</span> 
@@ -14324,26 +14406,26 @@ see further down how to do that</p>
 
 
 <div class="output_subarea output_stream output_stdout output_text">
-<pre>[D 17:28:43.767 ophydobj:187] This is the first instance of OphydObject. name={self.name}, id={id(self)}
-[D 17:28:43.821 device:520] Staging sig
-[D 17:28:43.822 &lt;ipython-input-14-7b7f6cdf7089&gt;:7] ReadonlyDevice method trigger returned DeviceStatus(device=sig, done=True, success=True)
-[D 17:28:43.823 &lt;ipython-input-14-7b7f6cdf7089&gt;:14] EpicsSignalRO method read returned {&#39;sig_ro&#39;: {&#39;value&#39;: 0.0, &#39;timestamp&#39;: 1566919723.50771}}
-[D 17:28:43.836 &lt;ipython-input-14-7b7f6cdf7089&gt;:14] EpicsSignalRO method read returned {&#39;sig_ro2&#39;: {&#39;value&#39;: 499621.31788209, &#39;timestamp&#39;: 1565684923.028094}}
-[D 17:28:43.836 &lt;ipython-input-14-7b7f6cdf7089&gt;:14] ReadonlyDevice method read returned OrderedDict([(&#39;sig_ro&#39;, {&#39;value&#39;: 0.0, &#39;timestamp&#39;: 1566919723.50771}), (&#39;sig_ro2&#39;, {&#39;value&#39;: 499621.31788209, &#39;timestamp&#39;: 1565684923.028094})])
-[D 17:28:43.838 device:586] Unstaging sig
+<pre>[D 14:05:25.818 ophydobj:187] This is the first instance of OphydObject. name={self.name}, id={id(self)}
+[D 14:05:25.871 device:520] Staging sig
+[D 14:05:25.872 &lt;ipython-input-13-7b7f6cdf7089&gt;:7] ReadonlyDevice method trigger returned DeviceStatus(device=sig, done=True, success=True)
+[D 14:05:25.873 &lt;ipython-input-13-7b7f6cdf7089&gt;:14] EpicsSignalRO method read returned {&#39;sig_ro&#39;: {&#39;value&#39;: 0.0, &#39;timestamp&#39;: 1567080325.497173}}
+[D 14:05:25.887 &lt;ipython-input-13-7b7f6cdf7089&gt;:14] EpicsSignalRO method read returned {&#39;sig_ro2&#39;: {&#39;value&#39;: 499621.31788209, &#39;timestamp&#39;: 1565684923.028094}}
+[D 14:05:25.887 &lt;ipython-input-13-7b7f6cdf7089&gt;:14] ReadonlyDevice method read returned OrderedDict([(&#39;sig_ro&#39;, {&#39;value&#39;: 0.0, &#39;timestamp&#39;: 1567080325.497173}), (&#39;sig_ro2&#39;, {&#39;value&#39;: 499621.31788209, &#39;timestamp&#39;: 1565684923.028094})])
+[D 14:05:25.889 device:586] Unstaging sig
 </pre>
 </div>
 </div>
 
 <div class="output_area">
 
-    <div class="prompt output_prompt">Out[26]:</div>
+    <div class="prompt output_prompt">Out[24]:</div>
 
 
 
 
 <div class="output_text output_subarea output_execute_result">
-<pre>(&#39;30e59bbb-59bc-4f6e-b495-12975a4fea71&#39;,)</pre>
+<pre>(&#39;2dfc55ef-edd7-4133-a003-a11214e0f19f&#39;,)</pre>
 </div>
 
 </div>
@@ -14360,13 +14442,14 @@ see further down how to do that</p>
 <li>We can see one trigger</li>
 <li>and two read calls.</li>
 </ul>
-<p>That's the policy of bluesky (as far as I understand)</p>
+<p>Bliuesky policy:</p>
 <ul>
 <li><p>It will call trigger only for the top device. It is 
 the responsiblity of this device to delegate the triggers to other objects
-if required.</p>
+if required. (Standard implementation: do nothing)</p>
 </li>
-<li><p>Reads are then transfered to all other devices.</p>
+<li><p>Bluesky will call read on the <code>ophyd.Device.read</code>. The standard implementation will traverse
+the tree and read all signals.</p>
 </li>
 </ul>
 <p>Please note that devices can be generated as a tree. The user can call handle 
@@ -14383,7 +14466,7 @@ the add_callback method of the status object.</p>
 </div></section><section>
 <div class="cell border-box-sizing code_cell rendered">
 <div class="input">
-<div class="prompt input_prompt">In&nbsp;[27]:</div>
+<div class="prompt input_prompt">In&nbsp;[25]:</div>
 <div class="inner_cell">
     <div class="input_area">
 <div class=" highlight hl-ipython3"><pre><span></span><span class="kn">from</span> <span class="nn">ophyd</span> <span class="k">import</span> <span class="n">Component</span> <span class="k">as</span> <span class="n">Cpt</span>
@@ -14425,7 +14508,7 @@ the add_callback method of the status object.</p>
 </div></section><section>
 <div class="cell border-box-sizing code_cell rendered">
 <div class="input">
-<div class="prompt input_prompt">In&nbsp;[28]:</div>
+<div class="prompt input_prompt">In&nbsp;[26]:</div>
 <div class="inner_cell">
     <div class="input_area">
 <div class=" highlight hl-ipython3"><pre><span></span><span class="kn">from</span> <span class="nn">bluesky</span> <span class="k">import</span> <span class="n">plans</span> <span class="k">as</span> <span class="n">bps</span><span class="p">,</span> <span class="n">RunEngine</span> 
@@ -14461,8 +14544,8 @@ the add_callback method of the status object.</p>
 
 
 <div class="output_subarea output_stream output_stdout output_text">
-<pre>[D 17:28:43.872 ophydobj:187] This is the first instance of OphydObject. name={self.name}, id={id(self)}
-[E 17:28:48.934 run_engine:1522] Run aborted
+<pre>[D 14:05:25.914 ophydobj:187] This is the first instance of OphydObject. name={self.name}, id={id(self)}
+[E 14:05:30.975 run_engine:1522] Run aborted
     Traceback (most recent call last):
       File &#34;/home/mfp/Devel/nsls_ii/bluesky/bluesky/run_engine.py&#34;, line 1390, in _run
         msg = self._plan_stack[-1].send(resp)
@@ -14497,7 +14580,7 @@ the add_callback method of the status object.</p>
       File &#34;/home/mfp/Devel/nsls_ii/bluesky/bluesky/plan_stubs.py&#34;, line 362, in wait
         return (yield Msg(&#39;wait&#39;, None, group=group))
     bluesky.utils.FailedStatus: AndStatus(done=True, success=False)
-[E 17:28:48.934 run_engine:1522] Run aborted
+[E 14:05:30.975 run_engine:1522] Run aborted
     Traceback (most recent call last):
       File &#34;/home/mfp/Devel/nsls_ii/bluesky/bluesky/run_engine.py&#34;, line 1390, in _run
         msg = self._plan_stack[-1].send(resp)
@@ -14542,7 +14625,7 @@ the add_callback method of the status object.</p>
 
 
 <div class="output_subarea output_stream output_stderr output_text">
-<pre>Exception in thread Thread-7:
+<pre>Exception in thread Thread-5:
 Traceback (most recent call last):
   File &#34;/home/mfp/Devel/nsls_ii/ophyd/ophyd/status.py&#34;, line 79, in _wait_and_cleanup
     wait(self, timeout=timeout, poll_rate=0.2)
@@ -14563,7 +14646,7 @@ Traceback (most recent call last):
     self.device.stop()
 AttributeError: &#39;EpicsSignalRO&#39; object has no attribute &#39;stop&#39;
 
-Exception in thread Thread-8:
+Exception in thread Thread-6:
 Traceback (most recent call last):
   File &#34;/home/mfp/Devel/nsls_ii/ophyd/ophyd/status.py&#34;, line 79, in _wait_and_cleanup
     wait(self, timeout=timeout, poll_rate=0.2)
@@ -14597,7 +14680,7 @@ AttributeError: &#39;EpicsSignalRO&#39; object has no attribute &#39;stop&#39;
 <pre>
 <span class="ansi-red-fg">---------------------------------------------------------------------------</span>
 <span class="ansi-red-fg">FailedStatus</span>                              Traceback (most recent call last)
-<span class="ansi-green-fg">&lt;ipython-input-28-5effec8e31c9&gt;</span> in <span class="ansi-cyan-fg">&lt;module&gt;</span><span class="ansi-blue-fg">()</span>
+<span class="ansi-green-fg">&lt;ipython-input-26-5effec8e31c9&gt;</span> in <span class="ansi-cyan-fg">&lt;module&gt;</span><span class="ansi-blue-fg">()</span>
 <span class="ansi-green-intense-fg ansi-bold">     15</span> 
 <span class="ansi-green-intense-fg ansi-bold">     16</span> detectors <span class="ansi-blue-fg">=</span> <span class="ansi-blue-fg">[</span>ro_dev<span class="ansi-blue-fg">]</span>
 <span class="ansi-green-fg">---&gt; 17</span><span class="ansi-red-fg"> </span>RE<span class="ansi-blue-fg">(</span>bps<span class="ansi-blue-fg">.</span>count<span class="ansi-blue-fg">(</span>detectors<span class="ansi-blue-fg">,</span> <span class="ansi-cyan-fg">1</span><span class="ansi-blue-fg">)</span><span class="ansi-blue-fg">)</span>
@@ -14800,11 +14883,12 @@ ophyd subscribes to the device</li>
 <div class="cell border-box-sizing text_cell rendered"><div class="prompt input_prompt">
 </div><div class="inner_cell">
 <div class="text_cell_render border-box-sizing rendered_html">
-<h2>Ophyd signals: everything is a signal </h2><p>Compariosn: Unix everything is a file</p>
+<h2>Ophyd abstracton: everything is a signal </h2><p>Comparison: <code>Unix everything is a file</code></p>
 <p>Ophyd:</p>
 <ul>
-<li>Everything is a signal</li>
-<li>Signals are used to create events</li>
+<li><code>Everything is a signal</code></li>
+<li>Signals can be subscribed to</li>
+<li>Signals are used to encapsulate hardware access (for <code>ÈPICS</code>)</li>
 <li>Lifeplots can use them</li>
 <li>Bluesky run engine uses signals to gather device information</li>
 <li>See further down on event model to understand how it simplifies
@@ -14844,7 +14928,7 @@ this category. Personally I prefer to think of an actuator instead of a motor.</
 </div></section><section>
 <div class="cell border-box-sizing code_cell rendered">
 <div class="input">
-<div class="prompt input_prompt">In&nbsp;[29]:</div>
+<div class="prompt input_prompt">In&nbsp;[&nbsp;]:</div>
 <div class="inner_cell">
     <div class="input_area">
 <div class=" highlight hl-ipython3"><pre><span></span><span class="kn">from</span> <span class="nn">ophyd</span> <span class="k">import</span> <span class="n">EpicsSignal</span><span class="p">,</span> <span class="n">EpicsSignalRO</span><span class="p">,</span> <span class="n">PVPositioner</span><span class="p">,</span> <span class="n">Component</span> <span class="k">as</span> <span class="n">Cpt</span>
@@ -14869,10 +14953,10 @@ this category. Personally I prefer to think of an actuator instead of a motor.</
 <li>readback: a variable that descrives the read back value</li>
 <li>done: a variable that indicates if the move is finished</li>
 </ul>
-<p><strong>Note</strong>: ophyd will consider the move finished when the variable done is set to <strong>True</strong>
-Setpoint is only used to set the value, readback to read the value
+<p><strong>Note</strong>: ophyd will consider the move finished when the variable done is set to <strong>True</strong>.
+Setpoint is only used to set the value, readback to read the value.
 Based on these signals the user can get feedback on how long it will take that the 
-move is finished</p>
+move is finished.</p>
 
 </div>
 </div>
@@ -14885,14 +14969,14 @@ move is finished</p>
 <li>done: indication value can be set to <strong>False</strong></li>
 <li>stop value: used to request a stop to the actuator</li>
 </ul>
-<p>See an implementation for a BESSY II monochromator for a idea of it</p>
+<p>E.g.: BESSY II monochromator</p>
 
 </div>
 </div>
 </div><div class="fragment">
 <div class="cell border-box-sizing code_cell rendered">
 <div class="input">
-<div class="prompt input_prompt">In&nbsp;[30]:</div>
+<div class="prompt input_prompt">In&nbsp;[&nbsp;]:</div>
 <div class="inner_cell">
     <div class="input_area">
 <div class=" highlight hl-ipython3"><pre><span></span><span class="kn">from</span> <span class="nn">ophyd</span> <span class="k">import</span> <span class="n">EpicsSignal</span><span class="p">,</span> <span class="n">EpicsSignalRO</span><span class="p">,</span> <span class="n">PVPositioner</span><span class="p">,</span> <span class="n">Component</span> <span class="k">as</span> <span class="n">Cpt</span>
@@ -14917,19 +15001,19 @@ move is finished</p>
 <h3>Adapting it further to our needs</h3><p>The monochromator now is fairly nicely  fulfilling our needs. But we can go further....</p>
 <p>Ophyd follows the idea of intelligent devices:</p>
 <ul>
-<li>Settle time: how long does it take a device to stabilise after 
+<li><code>Settle time</code>: how long does it take a device to stabilise after 
 the movement has signalled finished (e.g. a bar stops osszilating)</li>
-<li>Time out: maximum time that the movement is allowwed to take</li>
+<li><code>Time out</code>: maximum time that the movement is allowwed to take</li>
 </ul>
-<p><strong>NB</strong> these are variables of the status object. Thus' these can be 
-computed if required....</p>
+<p><strong>NB</strong> these are variables of the status object. Thus <code>settle_time</code> and <code>timeout</code>  can be 
+computed if required (see following slide)</p>
 
 </div>
 </div>
 </div></section><section>
 <div class="cell border-box-sizing code_cell rendered">
 <div class="input">
-<div class="prompt input_prompt">In&nbsp;[31]:</div>
+<div class="prompt input_prompt">In&nbsp;[&nbsp;]:</div>
 <div class="inner_cell">
     <div class="input_area">
 <div class=" highlight hl-ipython3"><pre><span></span><span class="k">class</span> <span class="nc">_Monochromator</span><span class="p">(</span> <span class="n">PVPositioner</span> <span class="p">):</span>
@@ -14956,7 +15040,8 @@ computed if required....</p>
         <span class="k">def</span> <span class="nf">cb_rdbk</span><span class="p">(</span><span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
             <span class="k">return</span> <span class="kc">True</span>
         
-        <span class="n">stat_rdbk</span> <span class="o">=</span> <span class="n">SubscriptionStatus</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">readback</span><span class="p">,</span> <span class="n">cb_rdbk</span><span class="p">,</span> <span class="n">run</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span> <span class="n">timeout</span> <span class="o">=</span> <span class="mi">1</span><span class="p">,</span> <span class="n">settle_time</span> <span class="o">=</span> <span class="mi">2</span><span class="p">)</span>
+        <span class="n">timeout</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">calc_timeout</span><span class="p">()</span> <span class="c1"># Method to implement</span>
+        <span class="n">stat_rdbk</span> <span class="o">=</span> <span class="n">SubscriptionStatus</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">readback</span><span class="p">,</span> <span class="n">cb_rdbk</span><span class="p">,</span> <span class="n">run</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span> <span class="n">timeout</span> <span class="o">=</span> <span class="n">timeout</span><span class="p">,</span> <span class="n">settle_time</span> <span class="o">=</span> <span class="mi">2</span><span class="p">)</span>
         <span class="k">return</span> <span class="n">stat_rdbk</span>
 
 <span class="k">class</span> <span class="nc">Monochromator</span><span class="p">(</span> <span class="n">Device</span> <span class="p">):</span>
@@ -14967,11 +15052,11 @@ computed if required....</p>
 </div>
 </div>
 
-</div></section><section>
+</div></section></section><section><section>
 <div class="cell border-box-sizing text_cell rendered"><div class="prompt input_prompt">
 </div><div class="inner_cell">
 <div class="text_cell_render border-box-sizing rendered_html">
-<h3> Everything is a signal </h3><p>Settle time and timeouts are values, which can be convieniently stored in the event document.</p>
+<h2> Everything is a signal </h2><p>Settle time and timeouts are values, which can be convieniently stored in the event document.</p>
 <p>This can be handled too: make these values signals</p>
 
 </div>
@@ -14979,7 +15064,7 @@ computed if required....</p>
 </div></section><section>
 <div class="cell border-box-sizing code_cell rendered">
 <div class="input">
-<div class="prompt input_prompt">In&nbsp;[32]:</div>
+<div class="prompt input_prompt">In&nbsp;[&nbsp;]:</div>
 <div class="inner_cell">
     <div class="input_area">
 <div class=" highlight hl-ipython3"><pre><span></span><span class="kn">from</span> <span class="nn">ophyd</span> <span class="k">import</span> <span class="n">PVPositioner</span><span class="p">,</span> <span class="n">Component</span> <span class="k">as</span> <span class="n">Cpt</span><span class="p">,</span> <span class="n">Signal</span><span class="p">,</span> <span class="n">EpicsSignal</span><span class="p">,</span> <span class="n">EpicsSignalRO</span>
@@ -15017,74 +15102,10 @@ computed if required....</p>
 </div>
 </div>
 
-</div></section></section><section><section>
-<div class="cell border-box-sizing text_cell rendered"><div class="prompt input_prompt">
-</div><div class="inner_cell">
-<div class="text_cell_render border-box-sizing rendered_html">
-<h3> Marking signals as configuration signals</h3><p>Blueskys RunEngin will emit event documents. The setup is described in <a href="http://nsls-ii.github.io//architecture-overview.html">http://nsls-ii.github.io//architecture-overview.html</a>.</p>
-<p>As a rule of thumb:</p>
-<ul>
-<li>Ophydd devices can contain a tree of devices</li>
-<li>Bluesky inspects the devices and read all signals</li>
-<li>The information of all signals will be added to each event</li>
-</ul>
-
-</div>
-</div>
-</div>
-<div class="cell border-box-sizing code_cell rendered">
-<div class="input">
-<div class="prompt input_prompt">In&nbsp;[&nbsp;]:</div>
-<div class="inner_cell">
-    <div class="input_area">
-<div class=" highlight hl-ipython3"><pre><span></span> 
-</pre></div>
-
-    </div>
-</div>
-</div>
-
-</div><div class="fragment">
-<div class="cell border-box-sizing code_cell rendered">
-<div class="input">
-<div class="prompt input_prompt">In&nbsp;[33]:</div>
-<div class="inner_cell">
-    <div class="input_area">
-<div class=" highlight hl-ipython3"><pre><span></span><span class="k">class</span> <span class="nc">_Monochromator</span><span class="p">(</span> <span class="n">PVPositioner</span> <span class="p">):</span>
-    <span class="c1"># Class members only stored in configuration run</span>
-    <span class="n">_default_configuration_attrs</span> <span class="o">=</span> <span class="p">(</span><span class="s1">&#39;timeout&#39;</span><span class="p">,</span> <span class="s1">&#39;settle_time&#39;</span><span class="p">)</span>
-</pre></div>
-
-    </div>
-</div>
-</div>
-
-</div></div><div class="fragment">
-<div class="cell border-box-sizing text_cell rendered"><div class="prompt input_prompt">
-</div><div class="inner_cell">
-<div class="text_cell_render border-box-sizing rendered_html">
-<p>In this case the timeout and settle time variables are read out only at the beginning of the run.</p>
-
-</div>
-</div>
-</div></div></section><section>
-<div class="cell border-box-sizing text_cell rendered"><div class="prompt input_prompt">
-</div><div class="inner_cell">
-<div class="text_cell_render border-box-sizing rendered_html">
-<h3> A slow moving device </h3><p>If we have a slow moving device, perhaps we want to compute the acceptable 
-time for the movement. This time can depend very much on the required time ...</p>
-<p>Here two points should be separated:</p>
-<ul>
-<li>appropriate time out value depends on the path length (see next slide)</li>
-<li>how to inform the user, that progress takes some time</li>
-</ul>
-
-</div>
-</div>
 </div></section><section>
 <div class="cell border-box-sizing code_cell rendered">
 <div class="input">
-<div class="prompt input_prompt">In&nbsp;[34]:</div>
+<div class="prompt input_prompt">In&nbsp;[&nbsp;]:</div>
 <div class="inner_cell">
     <div class="input_area">
 <div class=" highlight hl-ipython3"><pre><span></span><span class="k">class</span> <span class="nc">SlowMovingDevice</span> <span class="p">(</span> <span class="n">PVPositioner</span> <span class="p">):</span>
@@ -15129,6 +15150,57 @@ time for the movement. This time can depend very much on the required time ...</
 <div class="cell border-box-sizing text_cell rendered"><div class="prompt input_prompt">
 </div><div class="inner_cell">
 <div class="text_cell_render border-box-sizing rendered_html">
+<h3> Marking signals as configuration signals</h3><p>Blueskys RunEngine will emit event documents. The setup is described in <a href="http://nsls-ii.github.io//architecture-overview.html">http://nsls-ii.github.io//architecture-overview.html</a>.</p>
+<p>As a rule of thumb:</p>
+<ul>
+<li>Ophyd devices can contain a tree of devices</li>
+<li>Bluesky inspects the devices and read all signals</li>
+<li>The information of all signals will be added to each event</li>
+</ul>
+
+</div>
+</div>
+</div><div class="fragment">
+<div class="cell border-box-sizing code_cell rendered">
+<div class="input">
+<div class="prompt input_prompt">In&nbsp;[&nbsp;]:</div>
+<div class="inner_cell">
+    <div class="input_area">
+<div class=" highlight hl-ipython3"><pre><span></span><span class="k">class</span> <span class="nc">_Monochromator</span><span class="p">(</span> <span class="n">PVPositioner</span> <span class="p">):</span>
+    <span class="c1"># Class members only stored in configuration run</span>
+    <span class="n">_default_configuration_attrs</span> <span class="o">=</span> <span class="p">(</span><span class="s1">&#39;timeout&#39;</span><span class="p">,</span> <span class="s1">&#39;settle_time&#39;</span><span class="p">)</span>
+</pre></div>
+
+    </div>
+</div>
+</div>
+
+</div></div><div class="fragment">
+<div class="cell border-box-sizing text_cell rendered"><div class="prompt input_prompt">
+</div><div class="inner_cell">
+<div class="text_cell_render border-box-sizing rendered_html">
+<p>In this case the timeout and settle time variables are read out only at the beginning of the run.</p>
+
+</div>
+</div>
+</div></div></section><section>
+<div class="cell border-box-sizing text_cell rendered"><div class="prompt input_prompt">
+</div><div class="inner_cell">
+<div class="text_cell_render border-box-sizing rendered_html">
+<h3> A slow moving device </h3><p>If we have a slow moving device, perhaps we want to compute the acceptable 
+time for the movement. This time can depend very much on the required time ...</p>
+<p>Here two points should be separated:</p>
+<ul>
+<li>appropriate time out value depends on the path length (see next slide)</li>
+<li>how to inform the user, that progress takes some time</li>
+</ul>
+
+</div>
+</div>
+</div></section></section><section><section>
+<div class="cell border-box-sizing text_cell rendered"><div class="prompt input_prompt">
+</div><div class="inner_cell">
+<div class="text_cell_render border-box-sizing rendered_html">
 <h3> Informing the user on progress </h3><ul>
 <li>Progress bar: provided by bluesky</li>
 <li>Requires attachment to RunEngine</li>
@@ -15139,7 +15211,7 @@ time for the movement. This time can depend very much on the required time ...</
 </div><div class="fragment">
 <div class="cell border-box-sizing code_cell rendered">
 <div class="input">
-<div class="prompt input_prompt">In&nbsp;[35]:</div>
+<div class="prompt input_prompt">In&nbsp;[&nbsp;]:</div>
 <div class="inner_cell">
     <div class="input_area">
 <div class=" highlight hl-ipython3"><pre><span></span><span class="kn">from</span> <span class="nn">bluesky.utils</span> <span class="k">import</span> <span class="n">ProgressBarManager</span>
@@ -15178,7 +15250,7 @@ see next slide</p>
 </div></section><section>
 <div class="cell border-box-sizing code_cell rendered">
 <div class="input">
-<div class="prompt input_prompt">In&nbsp;[36]:</div>
+<div class="prompt input_prompt">In&nbsp;[&nbsp;]:</div>
 <div class="inner_cell">
     <div class="input_area">
 <div class=" highlight hl-ipython3"><pre><span></span><span class="k">class</span> <span class="nc">FollowStatus</span><span class="p">(</span><span class="n">ophyd</span><span class="o">.</span><span class="n">status</span><span class="o">.</span><span class="n">SubscriptionStatus</span><span class="p">):</span>
@@ -15216,7 +15288,7 @@ see next slide</p>
 </div><div class="fragment">
 <div class="cell border-box-sizing code_cell rendered">
 <div class="input">
-<div class="prompt input_prompt">In&nbsp;[37]:</div>
+<div class="prompt input_prompt">In&nbsp;[&nbsp;]:</div>
 <div class="inner_cell">
     <div class="input_area">
 <div class=" highlight hl-ipython3"><pre><span></span><span class="k">class</span> <span class="nc">FollowStatus</span><span class="p">(</span><span class="n">ophyd</span><span class="o">.</span><span class="n">status</span><span class="o">.</span><span class="n">SubscriptionStatus</span><span class="p">):</span>
@@ -15266,7 +15338,7 @@ see next slide</p>
 </div></section><section>
 <div class="cell border-box-sizing code_cell rendered">
 <div class="input">
-<div class="prompt input_prompt">In&nbsp;[38]:</div>
+<div class="prompt input_prompt">In&nbsp;[&nbsp;]:</div>
 <div class="inner_cell">
     <div class="input_area">
 <div class=" highlight hl-ipython3"><pre><span></span><span class="kn">from</span> <span class="nn">ophyd.sim</span> <span class="k">import</span> <span class="n">SynAxis</span><span class="p">,</span> <span class="n">det</span>
@@ -15323,90 +15395,48 @@ see next slide</p>
 </div>
 </div>
 
-<div class="output_wrapper">
-<div class="output">
-
-
-<div class="output_area">
-
-    <div class="prompt"></div>
-
-
-<div class="output_subarea output_stream output_stdout output_text">
-<pre>Transient Scan ID: 9     Time: 2019-08-27 17:29:16
-Persistent Unique Scan ID: &#39;28009dff-258c-49db-95f9-5b27fc6bc82e&#39;
-motor [In progress. No progress bar available.]                                
-A &#39;deferred pause&#39; has been requested. The RunEngine will pause at the next checkpoint. To pause immediately, hit Ctrl+C again in the next 10 seconds.Deferred pause acknowledged. Continuing to checkpoint.
-
-trying a second time
-Pausing...
-                                                                               
-</pre>
-</div>
-</div>
-
-<div class="output_area">
-
-    <div class="prompt"></div>
-
-
-<div class="output_subarea output_text output_error">
-<pre>
-<span class="ansi-red-fg">---------------------------------------------------------------------------</span>
-<span class="ansi-red-fg">RunEngineInterrupted</span>                      Traceback (most recent call last)
-<span class="ansi-green-fg">&lt;ipython-input-38-6afc735e2411&gt;</span> in <span class="ansi-cyan-fg">&lt;module&gt;</span><span class="ansi-blue-fg">()</span>
-<span class="ansi-green-intense-fg ansi-bold">     46</span> RE<span class="ansi-blue-fg">.</span>log<span class="ansi-blue-fg">.</span>setLevel<span class="ansi-blue-fg">(</span><span class="ansi-blue-fg">&#39;WARNING&#39;</span><span class="ansi-blue-fg">)</span>
-<span class="ansi-green-intense-fg ansi-bold">     47</span> detectors <span class="ansi-blue-fg">=</span> <span class="ansi-blue-fg">[</span>det<span class="ansi-blue-fg">]</span>
-<span class="ansi-green-fg">---&gt; 48</span><span class="ansi-red-fg"> </span>RE<span class="ansi-blue-fg">(</span>bp<span class="ansi-blue-fg">.</span>scan<span class="ansi-blue-fg">(</span>detectors<span class="ansi-blue-fg">,</span> motor<span class="ansi-blue-fg">,</span> <span class="ansi-cyan-fg">0</span><span class="ansi-blue-fg">,</span> <span class="ansi-cyan-fg">3</span><span class="ansi-blue-fg">,</span> num<span class="ansi-blue-fg">=</span><span class="ansi-cyan-fg">2</span><span class="ansi-blue-fg">)</span><span class="ansi-blue-fg">)</span>
-
-<span class="ansi-green-fg">/home/mfp/Devel/nsls_ii/bluesky/bluesky/run_engine.py</span> in <span class="ansi-cyan-fg">__call__</span><span class="ansi-blue-fg">(self, *args, **metadata_kw)</span>
-<span class="ansi-green-intense-fg ansi-bold">    836</span> 
-<span class="ansi-green-intense-fg ansi-bold">    837</span>         <span class="ansi-green-fg">if</span> self<span class="ansi-blue-fg">.</span>_interrupted<span class="ansi-blue-fg">:</span>
-<span class="ansi-green-fg">--&gt; 838</span><span class="ansi-red-fg">             </span><span class="ansi-green-fg">raise</span> RunEngineInterrupted<span class="ansi-blue-fg">(</span>self<span class="ansi-blue-fg">.</span>pause_msg<span class="ansi-blue-fg">)</span> <span class="ansi-green-fg">from</span> <span class="ansi-green-fg">None</span>
-<span class="ansi-green-intense-fg ansi-bold">    839</span> 
-<span class="ansi-green-intense-fg ansi-bold">    840</span>         <span class="ansi-green-fg">return</span> tuple<span class="ansi-blue-fg">(</span>self<span class="ansi-blue-fg">.</span>_run_start_uids<span class="ansi-blue-fg">)</span>
-
-<span class="ansi-red-fg">RunEngineInterrupted</span>: 
-Your RunEngine is entering a paused state. These are your options for changing
-the state of the RunEngine:
-
-RE.resume()    Resume the plan.
-RE.abort()     Perform cleanup, then kill plan. Mark exit_stats=&#39;aborted&#39;.
-RE.stop()      Perform cleanup, then kill plan. Mark exit_status=&#39;success&#39;.
-RE.halt()      Emergency Stop: Do not perform cleanup --- just stop.
-</pre>
-</div>
-</div>
+</div></section></section><section><section>
+<div class="cell border-box-sizing text_cell rendered"><div class="prompt input_prompt">
+</div><div class="inner_cell">
+<div class="text_cell_render border-box-sizing rendered_html">
+<h2> Summary </h2><ul>
+<li><p><code>ophyd</code> abstracts devices</p>
+<ul>
+<li>standarised interface</li>
+<li>here today only simple devices</li>
+<li>methods covered: <code>trigger</code>, <code>read</code>, <code>set</code></li>
+</ul>
+</li>
+<li><p><code>Bluesky</code> provides tools</p>
+<ul>
+<li>for generating measurment plans </li>
+<li><p>for executing measurements (sequence them)</p>
+</li>
+<li><p>Not yet covered</p>
+<ul>
+<li>simple life plots</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
 
 </div>
 </div>
+</div></section></section><section><section>
+<div class="cell border-box-sizing text_cell rendered"><div class="prompt input_prompt">
+</div><div class="inner_cell">
+<div class="text_cell_render border-box-sizing rendered_html">
+<h2> Outlook </h2><p>Possible topics:</p>
+<ul>
+<li>making a simple measurement using bluesky</li>
+<li>making liveplots</li>
+<li>writing bluesky plans</li>
+<li>introduction to flyable devices (i.e. devices that are triggered within a measruement setup </li>
+</ul>
 
 </div>
-<div class="cell border-box-sizing code_cell rendered">
-<div class="input">
-<div class="prompt input_prompt">In&nbsp;[&nbsp;]:</div>
-<div class="inner_cell">
-    <div class="input_area">
-<div class=" highlight hl-ipython3"><pre><span></span>bp.scan<span class="o">?</span>
-</pre></div>
-
-    </div>
 </div>
-</div>
-
-</div>
-<div class="cell border-box-sizing code_cell rendered">
-<div class="input">
-<div class="prompt input_prompt">In&nbsp;[&nbsp;]:</div>
-<div class="inner_cell">
-    <div class="input_area">
-<div class=" highlight hl-ipython3"><pre><span></span><span class="n">RE</span><span class="o">.</span><span class="n">stop</span><span class="p">()</span>
-</pre></div>
-
-    </div>
-</div>
-</div>
-
 </div></section></section><section><section>
 <div class="cell border-box-sizing text_cell rendered"><div class="prompt input_prompt">
 </div><div class="inner_cell">
