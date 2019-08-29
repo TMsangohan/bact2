@@ -14466,7 +14466,7 @@ the add_callback method of the status object.</p>
 </div></section><section>
 <div class="cell border-box-sizing code_cell rendered">
 <div class="input">
-<div class="prompt input_prompt">In&nbsp;[25]:</div>
+<div class="prompt input_prompt">In&nbsp;[27]:</div>
 <div class="inner_cell">
     <div class="input_area">
 <div class=" highlight hl-ipython3"><pre><span></span><span class="kn">from</span> <span class="nn">ophyd</span> <span class="k">import</span> <span class="n">Component</span> <span class="k">as</span> <span class="n">Cpt</span>
@@ -14494,7 +14494,7 @@ the add_callback method of the status object.</p>
             <span class="c1">#nonlocal ro_done</span>
             <span class="n">ro_done</span> <span class="o">=</span> <span class="kc">True</span>
         
-        <span class="n">stat2</span> <span class="o">=</span> <span class="n">SubscriptionStatus</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">ro</span><span class="p">,</span> <span class="n">cb2</span><span class="p">,</span> <span class="n">run</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span> <span class="n">timeout</span> <span class="o">=</span> <span class="mi">5</span><span class="p">)</span>
+        <span class="n">stat2</span> <span class="o">=</span> <span class="n">SubscriptionStatus</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">ro2</span><span class="p">,</span> <span class="n">cb2</span><span class="p">,</span> <span class="n">run</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span> <span class="n">timeout</span> <span class="o">=</span> <span class="mi">5</span><span class="p">)</span>
         <span class="n">stat</span> <span class="o">=</span> <span class="n">SubscriptionStatus</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">ro</span><span class="p">,</span> <span class="n">cb</span><span class="p">,</span> <span class="n">run</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span> <span class="n">timeout</span> <span class="o">=</span> <span class="mi">5</span><span class="p">)</span>
         <span class="n">stat</span><span class="o">.</span><span class="n">add_callback</span><span class="p">(</span><span class="n">delayed_call</span><span class="p">)</span>
         <span class="n">s</span> <span class="o">=</span> <span class="n">AndStatus</span><span class="p">(</span><span class="n">stat2</span><span class="p">,</span> <span class="n">stat</span><span class="p">)</span>
@@ -14508,7 +14508,7 @@ the add_callback method of the status object.</p>
 </div></section><section>
 <div class="cell border-box-sizing code_cell rendered">
 <div class="input">
-<div class="prompt input_prompt">In&nbsp;[26]:</div>
+<div class="prompt input_prompt">In&nbsp;[28]:</div>
 <div class="inner_cell">
     <div class="input_area">
 <div class=" highlight hl-ipython3"><pre><span></span><span class="kn">from</span> <span class="nn">bluesky</span> <span class="k">import</span> <span class="n">plans</span> <span class="k">as</span> <span class="n">bps</span><span class="p">,</span> <span class="n">RunEngine</span> 
@@ -14544,8 +14544,8 @@ the add_callback method of the status object.</p>
 
 
 <div class="output_subarea output_stream output_stdout output_text">
-<pre>[D 14:05:25.914 ophydobj:187] This is the first instance of OphydObject. name={self.name}, id={id(self)}
-[E 14:05:30.975 run_engine:1522] Run aborted
+<pre>[D 15:57:54.074 ophydobj:187] This is the first instance of OphydObject. name={self.name}, id={id(self)}
+[E 15:57:59.137 run_engine:1522] Run aborted
     Traceback (most recent call last):
       File &#34;/home/mfp/Devel/nsls_ii/bluesky/bluesky/run_engine.py&#34;, line 1390, in _run
         msg = self._plan_stack[-1].send(resp)
@@ -14580,7 +14580,7 @@ the add_callback method of the status object.</p>
       File &#34;/home/mfp/Devel/nsls_ii/bluesky/bluesky/plan_stubs.py&#34;, line 362, in wait
         return (yield Msg(&#39;wait&#39;, None, group=group))
     bluesky.utils.FailedStatus: AndStatus(done=True, success=False)
-[E 14:05:30.975 run_engine:1522] Run aborted
+[E 15:57:59.137 run_engine:1522] Run aborted
     Traceback (most recent call last):
       File &#34;/home/mfp/Devel/nsls_ii/bluesky/bluesky/run_engine.py&#34;, line 1390, in _run
         msg = self._plan_stack[-1].send(resp)
@@ -14625,28 +14625,7 @@ the add_callback method of the status object.</p>
 
 
 <div class="output_subarea output_stream output_stderr output_text">
-<pre>Exception in thread Thread-5:
-Traceback (most recent call last):
-  File &#34;/home/mfp/Devel/nsls_ii/ophyd/ophyd/status.py&#34;, line 79, in _wait_and_cleanup
-    wait(self, timeout=timeout, poll_rate=0.2)
-  File &#34;/home/mfp/Devel/nsls_ii/ophyd/ophyd/status.py&#34;, line 574, in wait
-    &#39;(elapsed {:.2f} sec)&#39;.format(timeout, elapsed))
-TimeoutError: Operation failed to complete within 5.0 seconds (elapsed 5.01 sec)
-
-During handling of the above exception, another exception occurred:
-
-Traceback (most recent call last):
-  File &#34;/usr/lib/python3.7/threading.py&#34;, line 917, in _bootstrap_inner
-    self.run()
-  File &#34;/usr/lib/python3.7/threading.py&#34;, line 865, in run
-    self._target(*self._args, **self._kwargs)
-  File &#34;/home/mfp/Devel/nsls_ii/ophyd/ophyd/status.py&#34;, line 87, in _wait_and_cleanup
-    self._handle_failure()
-  File &#34;/home/mfp/Devel/nsls_ii/ophyd/ophyd/status.py&#34;, line 299, in _handle_failure
-    self.device.stop()
-AttributeError: &#39;EpicsSignalRO&#39; object has no attribute &#39;stop&#39;
-
-Exception in thread Thread-6:
+<pre>Exception in thread Thread-8:
 Traceback (most recent call last):
   File &#34;/home/mfp/Devel/nsls_ii/ophyd/ophyd/status.py&#34;, line 79, in _wait_and_cleanup
     wait(self, timeout=timeout, poll_rate=0.2)
@@ -14680,7 +14659,7 @@ AttributeError: &#39;EpicsSignalRO&#39; object has no attribute &#39;stop&#39;
 <pre>
 <span class="ansi-red-fg">---------------------------------------------------------------------------</span>
 <span class="ansi-red-fg">FailedStatus</span>                              Traceback (most recent call last)
-<span class="ansi-green-fg">&lt;ipython-input-26-5effec8e31c9&gt;</span> in <span class="ansi-cyan-fg">&lt;module&gt;</span><span class="ansi-blue-fg">()</span>
+<span class="ansi-green-fg">&lt;ipython-input-28-5effec8e31c9&gt;</span> in <span class="ansi-cyan-fg">&lt;module&gt;</span><span class="ansi-blue-fg">()</span>
 <span class="ansi-green-intense-fg ansi-bold">     15</span> 
 <span class="ansi-green-intense-fg ansi-bold">     16</span> detectors <span class="ansi-blue-fg">=</span> <span class="ansi-blue-fg">[</span>ro_dev<span class="ansi-blue-fg">]</span>
 <span class="ansi-green-fg">---&gt; 17</span><span class="ansi-red-fg"> </span>RE<span class="ansi-blue-fg">(</span>bps<span class="ansi-blue-fg">.</span>count<span class="ansi-blue-fg">(</span>detectors<span class="ansi-blue-fg">,</span> <span class="ansi-cyan-fg">1</span><span class="ansi-blue-fg">)</span><span class="ansi-blue-fg">)</span>
@@ -15335,66 +15314,6 @@ see next slide</p>
 <h3> Watching progress </h3>
 </div>
 </div>
-</div></section><section>
-<div class="cell border-box-sizing code_cell rendered">
-<div class="input">
-<div class="prompt input_prompt">In&nbsp;[&nbsp;]:</div>
-<div class="inner_cell">
-    <div class="input_area">
-<div class=" highlight hl-ipython3"><pre><span></span><span class="kn">from</span> <span class="nn">ophyd.sim</span> <span class="k">import</span> <span class="n">SynAxis</span><span class="p">,</span> <span class="n">det</span>
-
-<span class="k">class</span> <span class="nc">SimMoveStatus</span><span class="p">(</span><span class="n">DeviceStatus</span><span class="p">):</span>
-    <span class="k">def</span> <span class="nf">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
-        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
-        
-        <span class="k">if</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">done</span><span class="p">:</span>
-            <span class="bp">self</span><span class="o">.</span><span class="n">device</span><span class="o">.</span><span class="n">subscribe</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_notify_watchers</span><span class="p">,</span>
-                                   <span class="c1"># event_type=self.device.SUB_READBACK</span>
-                                  <span class="p">)</span>
-
-    <span class="k">def</span> <span class="nf">_settled</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span>  <span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">device</span><span class="o">.</span><span class="n">clear_sub</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_notify_watchers</span><span class="p">)</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">_watchers</span><span class="o">.</span><span class="n">clear</span><span class="p">()</span>
-
-    <span class="k">def</span> <span class="nf">_notify_watchers</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">value</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
-        <span class="k">if</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">_watchers</span><span class="p">:</span>
-            <span class="k">return</span>
-        
-        <span class="n">dev</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">device</span>
-        <span class="k">for</span> <span class="n">watcher</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_watchers</span><span class="p">:</span>
-            <span class="n">watcher</span><span class="p">(</span><span class="n">name</span> <span class="o">=</span> <span class="n">dev</span><span class="o">.</span><span class="n">name</span><span class="p">,</span> <span class="n">current</span> <span class="o">=</span> <span class="n">dev</span><span class="o">.</span><span class="n">readback</span><span class="p">,</span> <span class="n">target</span> <span class="o">=</span> <span class="n">dev</span><span class="o">.</span><span class="n">setpoint</span>
-            <span class="p">)</span>
-
-<span class="k">class</span> <span class="nc">SlowSimulatedAxis</span><span class="p">(</span><span class="n">SynAxis</span><span class="p">):</span>
-    <span class="k">def</span> <span class="nf">set</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">value</span><span class="p">):</span>
-        <span class="n">stat</span> <span class="o">=</span> <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="n">value</span><span class="p">)</span>
-        <span class="c1">#self.log.warning(f&quot;status = {status} of type {type(status)}&quot;)</span>
-        
-        <span class="n">stat2</span> <span class="o">=</span> <span class="n">SimMoveStatus</span><span class="p">(</span><span class="n">device</span> <span class="o">=</span> <span class="bp">self</span><span class="p">)</span>
-        <span class="k">def</span> <span class="nf">cb_finished</span><span class="p">(</span><span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
-            <span class="k">nonlocal</span> <span class="n">stat2</span>
-            <span class="n">stat2</span><span class="o">.</span><span class="n">_finished</span><span class="p">()</span>
-        <span class="n">stat</span><span class="o">.</span><span class="n">add_callback</span><span class="p">(</span><span class="n">cb_finished</span><span class="p">)</span>
-        
-        <span class="k">return</span> <span class="n">stat2</span>
-        
-<span class="n">motor</span> <span class="o">=</span> <span class="n">SlowSimulatedAxis</span><span class="p">(</span><span class="n">name</span> <span class="o">=</span> <span class="s1">&#39;motor&#39;</span><span class="p">,</span> <span class="n">delay</span> <span class="o">=</span> <span class="o">.</span><span class="mi">5</span><span class="p">)</span>
-<span class="kn">from</span> <span class="nn">bluesky.utils</span> <span class="k">import</span> <span class="n">ProgressBarManager</span>
-<span class="kn">from</span> <span class="nn">bluesky.callbacks.best_effort</span> <span class="k">import</span> <span class="n">BestEffortCallback</span>
-
-<span class="kn">import</span> <span class="nn">bluesky.plans</span> <span class="k">as</span> <span class="nn">bp</span>
-
-<span class="n">RE</span><span class="o">.</span><span class="n">waiting_hook</span> <span class="o">=</span> <span class="n">ProgressBarManager</span><span class="p">()</span>
-<span class="c1"># RE.subscribe(BestEffortCallback())</span>
-<span class="n">RE</span><span class="o">.</span><span class="n">log</span><span class="o">.</span><span class="n">setLevel</span><span class="p">(</span><span class="s1">&#39;WARNING&#39;</span><span class="p">)</span>
-<span class="n">detectors</span> <span class="o">=</span> <span class="p">[</span><span class="n">det</span><span class="p">]</span>
-<span class="n">RE</span><span class="p">(</span><span class="n">bp</span><span class="o">.</span><span class="n">scan</span><span class="p">(</span><span class="n">detectors</span><span class="p">,</span> <span class="n">motor</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">3</span><span class="p">,</span> <span class="n">num</span><span class="o">=</span><span class="mi">2</span><span class="p">))</span>
-</pre></div>
-
-    </div>
-</div>
-</div>
-
 </div></section></section><section><section>
 <div class="cell border-box-sizing text_cell rendered"><div class="prompt input_prompt">
 </div><div class="inner_cell">
@@ -15432,7 +15351,12 @@ see next slide</p>
 <li>making a simple measurement using bluesky</li>
 <li>making liveplots</li>
 <li>writing bluesky plans</li>
-<li>introduction to flyable devices (i.e. devices that are triggered within a measruement setup </li>
+<li>introduction to flyable devices<ul>
+<li>abstraction of devices that measure while experiment status changes</li>
+<li>e.g. booster beam position monitors</li>
+<li>e.g. taking data during movements</li>
+</ul>
+</li>
 </ul>
 
 </div>
@@ -15484,32 +15408,6 @@ see next slide</p>
 
      <span class="k">def</span> <span class="nf">put</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
            <span class="k">raise</span> <span class="ne">Exception</span><span class="p">(</span><span class="s2">&quot;no, read only&quot;</span><span class="p">)</span>
-</pre></div>
-
-    </div>
-</div>
-</div>
-
-</div>
-<div class="cell border-box-sizing code_cell rendered">
-<div class="input">
-<div class="prompt input_prompt">In&nbsp;[&nbsp;]:</div>
-<div class="inner_cell">
-    <div class="input_area">
-<div class=" highlight hl-ipython3"><pre><span></span> 
-</pre></div>
-
-    </div>
-</div>
-</div>
-
-</div>
-<div class="cell border-box-sizing code_cell rendered">
-<div class="input">
-<div class="prompt input_prompt">In&nbsp;[&nbsp;]:</div>
-<div class="inner_cell">
-    <div class="input_area">
-<div class=" highlight hl-ipython3"><pre><span></span> 
 </pre></div>
 
     </div>
