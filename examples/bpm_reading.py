@@ -43,8 +43,8 @@ def main():
     sw_freq = cycler(sim.motor, freq)
 
 
-    if not bpm.connected:
-        bpm.wait_for_connection()
+    #if not bpm.connected:
+    #    bpm.wait_for_connection()
 
     #print (bpm.trigger())
     #print (bpm.waveform.ready.read())
@@ -65,21 +65,25 @@ def main():
     # serializer = Serializer('localhost',9200)
     # RE.subscribe(serializer)
 
-    fig1 = plt.figure(1)
-    ax1 = plt.subplot(211)
-    ax2 = plt.subplot(212)
-    fig1 = plt.figure(2)
-    ax3 = plt.subplot()
+    # a simpler plot for the status
+    fig2 = plt.figure(2)
+    ax_s = plt.subplot(111)
 
-    if compat:
-        ax1 = AxisWrapper(ax1)
-        ax2 = AxisWrapper(ax2)
-        ax3 = AxisWrapper(ax3)
+    # let's make one large plot displaying x and y readings next to
+    # the raw data readings
+    fig1 = plt.figure(1, figsize=[16,12])
+
+    ax_x = plt.subplot(221)
+    ax_y = plt.subplot(222)
+    ax_xr = plt.subplot(223)
+    ax_yr = plt.subplot(224)
     RE(bp.scan_nd(det, sw_freq * repeat),
        [
-           line_index.PlotLineVsIndexOffset("bpm_waveform_pos_x", ax = ax1, legend_keys = ['x']),
-           line_index.PlotLineVsIndexOffset("bpm_waveform_pos_y", ax = ax2, legend_keys = ['y']),
-           line_index.PlotLineVsIndex("bpm_waveform_status", ax = ax3, legend_keys = ['stat']),
+           line_index.PlotLineVsIndexOffset("bpm_waveform_pos_x_raw", ax = ax_x, legend_keys = ['x raw']),
+           line_index.PlotLineVsIndexOffset("bpm_waveform_pos_y_raw", ax = ax_y, legend_keys = ['y raw']),
+           line_index.PlotLineVsIndexOffset("bpm_waveform_pos_x", ax = ax_xr, legend_keys = ['x']),
+           line_index.PlotLineVsIndexOffset("bpm_waveform_pos_y", ax = ax_yr, legend_keys = ['y']),
+           line_index.PlotLineVsIndex("bpm_waveform_status", ax = ax_s, legend_keys = ['stat']),
        ]
     )
 
