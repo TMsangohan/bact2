@@ -47,32 +47,60 @@ class DerivedSignalLinear( DerivedSignal ):
     Warning:
         If the vector of gains does not contain a sufficient number
         of entries, the number of values will be truncated!
+
+    Todo:
+        Check vector length and raise an appropriate Exception
+        if these do not match
     '''
 
-    def __init__(self, parent_attr, *, parent = None, gain = None, **kwargs):
+    def __init__(self, parent_attr, *, parent = None, parent_gain_attr = None, **kwargs):
         bin_signal = getattr(parent, parent_attr)
         super().__init__(derived_from = bin_signal, parent = parent, **kwargs)
-        assert(gain is not None)
-        self._gain = gain
-
-    def _cutVector(self, values):
-        values = np.asarray(values)
-        l = len(self._gain)
-        return values[:l]
+        self._gain =  getattr(parent, parent_gain_attr)
+        assert(self._gain is not None)
 
     def forward(self, values):
-        values = self._cutVector(values)
-        return values * self._gain
+        return values * self._gain.value
 
     def inverse(self, values):
-        values = self._cutVector(values)
-        return  values / self._gain
+        return  values / self._gain.value
 
-@functools.lru_cache(maxsize=1)
-def _get_gains():
-    from . import bpm_gains
-    bpm_gains, gx, gy = bpm_gains.load_bpm_gains()
-    return gx, gy
+class BPMChannel( Device ):
+    '''A channel (or coordinate) of the bpm
+
+    The beam position monitor reading is split in the coordinates
+        * x
+        * y
+
+    This is made, as each channel requires the following signals:
+        * pos:     the actual position
+        * rms:     the rms of the actual position
+        * pos_raw: raw reading of the position
+        * rms_raw: rms of the raw reading
+        * gain:    a vector for rescaling the device
+
+
+    Warning:
+        It is the users responsibility to set the gains correctly!
+    '''
+
+    _default_config_attrs = ('gain',)
+
+    #: Relative beam offset as measured by the beam position monitors
+    pos_raw = Cpt(Signal, name = 'pos_raw')
+    #: and its rms value
+    rms_raw = Cpt(Signal, name = 'rms_raw')
+
+    #: gains for the channels
+    gain = Cpt(Signal, name = 'gain', value = 1.0)
+
+    #: processed data: already in mm
+    pos = Cpt(DerivedSignalLinear, parent_attr = 'pos_raw', parent_gain_attr = 'gain', name = 'pos')
+    rms = Cpt(DerivedSignalLinear, parent_attr = 'rms_raw', parent_gain_attr = 'gain', name = 'rms')
+
+
+    def trigger(self):
+        raise NotImplementedError('Use BPMWaveform instead')
 
 class BPMWaveform(  bpm_raw.BPMPackedData ):
     """Measurement data for the beam position monitors
@@ -86,26 +114,19 @@ class BPMWaveform(  bpm_raw.BPMPackedData ):
     #: Number of valid beam position monitors
     n_valid_bpms = 128
 
+    #: All data for x
+    x = Cpt(BPMChannel, 'x')
+    #: All data for y
+    y = Cpt(BPMChannel, 'y')
 
-    #: Relative horizontal beam offset as measured by the beam position monitors
-    pos_x_raw   = Cpt(Signal, name = "dx")
-    #: Relative vertical beam offset as measured by the beam position monitors
-    pos_y_raw   = Cpt(Signal, name = "dy")
-    #:
+    #: Data not sorted into the different channels
     intensity_z = Cpt(Signal, name = "z")
     intensity_s = Cpt(Signal, name = "s")
     status      = Cpt(Signal, name = "status")
-    gain        = Cpt(Signal, name = "gain")
-    rms_x_raw   = Cpt(Signal, name = "rms_x_raw")
-    rms_y_raw   = Cpt(Signal, name = "rms_y_raw")
 
-
-    pos_x = Cpt(DerivedSignalLinear, parent_attr = 'pos_x_raw', name = "x", gain = _get_gains()[0])
-    pos_y = Cpt(DerivedSignalLinear, parent_attr = 'pos_y_raw', name = "y", gain = _get_gains()[1])
-
-    rms_x = Cpt(DerivedSignalLinear, parent_attr = 'rms_x_raw', name = "rms_x", gain = _get_gains()[0])
-    rms_y = Cpt(DerivedSignalLinear, parent_attr = 'rms_y_raw', name = "rms_y", gain = _get_gains()[1])
-
+    #: gains as found in the packed data. The gains for recalculating
+    #: the values are found in the BPMChannels
+    gain_raw    = Cpt(Signal, name = "gain")
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -124,14 +145,14 @@ class BPMWaveform(  bpm_raw.BPMPackedData ):
         """
         stat = mat[4]
 
-        self.pos_x.put(      mat[0])
-        self.pos_y.put(      mat[1])
+        self.x.pos_raw.put(  mat[0])
+        self.y.pos_raw.put(  mat[1])
         self.intensity_z.put(mat[2])
         self.intensity_s.put(mat[3])
-        self.status.put(         stat)
-        self.gain.put(       mat[5])
-        self.rms_x.put(      mat[6])
-        self.rms_y.put(      mat[7])
+        self.status.put(       stat)
+        self.gain_raw.put(   mat[5])
+        self.x.rms_raw.put(  mat[6])
+        self.y.rms_raw.put(  mat[7])
 
 
     def checkAndStorePackedData(self, packed_data):
@@ -162,18 +183,6 @@ class BPMWaveform(  bpm_raw.BPMPackedData ):
 
         and_s = AndStatus(status, status_processed)
         return and_s
-
-
-
-
-#class ScaledBPMWaveForm( BPMWaveform ):
-#    '''
-#    '''
-#    #: Relative horizontal beam offset as measured by the beam position monitors in millimeters
-#    pos_x_mm = Cpt(DerivedSignalLinear, derived_from = BPMWaveform.pos_x, name = "dx", gain = 1.0)
-#    #: Relative vertical beam offset as measured by the beam position monitors
-#    pos_y_mm = Cpt(DerivedSignalLinear, derived_from = BPMWaveform.pos_y, name = "dy", gain = 1.0)
-
 
 
 class BPMStorageRing( Device ):

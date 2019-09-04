@@ -15,6 +15,8 @@ from bluesky.utils import install_qt_kicker
 from ophyd import sim
 
 from bact2.ophyd.devices.pp.bpm import BPMStorageRing
+from bact2.ophyd.devices.pp import bpm_gains
+
 import bact2
 import bact2.bluesky.hacks.callbacks
 from bact2.bluesky.live_plot import line_index
@@ -25,6 +27,11 @@ import numpy as np
 compat = False
 
 def main():
+    '''
+
+    Todo:
+       Fix gain treatment
+    '''
     # Repeat the measurement 5 times
     n_meas = 50
 
@@ -34,6 +41,9 @@ def main():
     freq = np.linspace(f0, f1, 5)
 
 
+    # These are the gains
+    _, gx, gy = bpm_gains.load_bpm_gains()
+
     bpm = BPMStorageRing(name = "bpm")
     cs = sim.motor2
 
@@ -42,9 +52,26 @@ def main():
 
     sw_freq = cycler(sim.motor, freq)
 
+    # A hack on missing gains
+    lgx = len(gx)
+    assert(lgx == len(gy))
+    if lgx > bpm.waveform.n_valid_bpms:
+        raise AssertionError('got more gains than expected')
+    elif lgx < bpm.waveform.n_valid_bpms:
+        gx_s = np.ones((bpm.waveform.n_valid_bpms,), dtype = np.float_)
+        gy_s = np.ones((bpm.waveform.n_valid_bpms,), dtype = np.float_)
+        gx_s[:lgx] = gx
+        gy_s[:lgx] = gy
+        gx, gy = gx_s, gy_s
 
-    #if not bpm.connected:
-    #    bpm.wait_for_connection()
+    bpm.waveform.x.gain.value = gx
+    bpm.waveform.y.gain.value = gy
+
+
+    if not bpm.connected:
+        bpm.wait_for_connection()
+
+
 
     #print (bpm.trigger())
     #print (bpm.waveform.ready.read())
@@ -79,10 +106,10 @@ def main():
     ax_yr = plt.subplot(224)
     RE(bp.scan_nd(det, sw_freq * repeat),
        [
-           line_index.PlotLineVsIndexOffset("bpm_waveform_pos_x_raw", ax = ax_x, legend_keys = ['x raw']),
-           line_index.PlotLineVsIndexOffset("bpm_waveform_pos_y_raw", ax = ax_y, legend_keys = ['y raw']),
-           line_index.PlotLineVsIndexOffset("bpm_waveform_pos_x", ax = ax_xr, legend_keys = ['x']),
-           line_index.PlotLineVsIndexOffset("bpm_waveform_pos_y", ax = ax_yr, legend_keys = ['y']),
+           line_index.PlotLineVsIndexOffset("bpm_waveform_x_pos_raw", ax = ax_x, legend_keys = ['x raw']),
+           line_index.PlotLineVsIndexOffset("bpm_waveform_y_pos_raw", ax = ax_y, legend_keys = ['y raw']),
+           line_index.PlotLineVsIndexOffset("bpm_waveform_x_pos", ax = ax_xr, legend_keys = ['x']),
+           line_index.PlotLineVsIndexOffset("bpm_waveform_y_pos", ax = ax_yr, legend_keys = ['y']),
            line_index.PlotLineVsIndex("bpm_waveform_status", ax = ax_s, legend_keys = ['stat']),
        ]
     )
