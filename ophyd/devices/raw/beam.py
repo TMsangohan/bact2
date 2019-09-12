@@ -1,4 +1,10 @@
-from ophyd import Component as Cpt, Device, EpicsSignalRO
+from ophyd import Component as Cpt, Device, EpicsSignalRO, Signal
+from ophyd import DerivedSignal
+from ophyd.status import SubscriptionStatus
+
+from bact.applib.lifetime.lifetime_calculate import fit_scaled_exp
+from collections import deque
+
 import numpy as np
 
 class BeamCurrent( Device ):
@@ -32,6 +38,16 @@ class BeamCurrent( Device ):
 
     readback = Cpt(EpicsSignalRO, 'TOPUPCC:rdCur', value = np.nan)
 
+class BeamCurrentTriggered( BeamCurrent ):
+    '''Beam currrent triggered by readback
+    '''
+    def trigger(self):
+
+        def cb(**kwargs):
+            return True
+        stat = SubscriptionStatus(self.readback, cb, run=False)
+        return stat
+    
 class Beam( Device ):
     """BESSY II Beam current.
 
@@ -41,3 +57,5 @@ class Beam( Device ):
                   #limits = (0, 5), settle_time = 1.0,
                   #timeout = 1.0,
     )
+
+
