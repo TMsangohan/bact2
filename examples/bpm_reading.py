@@ -15,7 +15,6 @@ from bluesky.utils import install_qt_kicker
 from ophyd import sim
 
 from bact2.ophyd.devices.pp.bpm import BPMStorageRing
-from bact2.ophyd.devices.pp import bpm_gains
 
 import bact2
 import bact2.bluesky.hacks.callbacks
@@ -33,7 +32,7 @@ def main():
        Fix gain treatment
     '''
     # Repeat the measurement 5 times
-    n_meas = 50
+    n_meas = 1
 
     # The frequency range
     f0 = 10
@@ -41,32 +40,22 @@ def main():
     freq = np.linspace(f0, f1, 5)
 
 
-    # These are the gains
-    _, gx, gy = bpm_gains.load_bpm_gains()
 
     bpm = BPMStorageRing(name = "bpm")
+    # bpm.waveform.x.gain.value = 1
+    # bpm.waveform.y.gain.value = 1
+
+    bpm_c = BPMStorageRing(name = "bpm_c")
+    del bpm_c.waveform.packed_data
+    bpm_c_waveform.packed_data = bpm._waveform.packed_data
+    bpm_c.waveform.x.gain.value = 1
+    bpm_c.waveform.y.gain.value = 1
     cs = sim.motor2
 
     # cs.inform_set_done = bpm.waveform.new_trigger
     repeat = cycler(cs, range(n_meas))
 
     sw_freq = cycler(sim.motor, freq)
-
-    # A hack on missing gains
-    lgx = len(gx)
-    assert(lgx == len(gy))
-    if lgx > bpm.waveform.n_valid_bpms:
-        raise AssertionError('got more gains than expected')
-    elif lgx < bpm.waveform.n_valid_bpms:
-        gx_s = np.ones((bpm.waveform.n_valid_bpms,), dtype = np.float_)
-        gy_s = np.ones((bpm.waveform.n_valid_bpms,), dtype = np.float_)
-        gx_s[:lgx] = gx
-        gy_s[:lgx] = gy
-        gx, gy = gx_s, gy_s
-
-    bpm.waveform.x.gain.value = gx
-    bpm.waveform.y.gain.value = gy
-
 
     if not bpm.connected:
         bpm.wait_for_connection()
@@ -75,13 +64,13 @@ def main():
 
     #print (bpm.trigger())
     #print (bpm.waveform.ready.read())
-    det = [bpm]
+    det = [bpm, bpm_c]
 
     bec = bc.best_effort.BestEffortCallback()
 
     RE = RunEngine({})
-    # RE.log.setLevel("DEBUG")
-    RE.log.setLevel("INFO")
+    #RE.log.setLevel("DEBUG")
+    #RE.log.setLevel("INFO")
     #print(dir(bpm))
     # bpm.waveform.measurement_state.setLogger(RE.log)
 
@@ -100,16 +89,18 @@ def main():
     # the raw data readings
     fig1 = plt.figure(1, figsize=[16,12])
 
-    ax_x = plt.subplot(221)
-    ax_y = plt.subplot(222)
+    ax_x  = plt.subplot(221)
+    ax_y  = plt.subplot(222)
     ax_xr = plt.subplot(223)
     ax_yr = plt.subplot(224)
     RE(bp.scan_nd(det, sw_freq * repeat),
        [
-           line_index.PlotLineVsIndexOffset("bpm_waveform_x_pos_raw", ax = ax_x, legend_keys = ['x raw']),
-           line_index.PlotLineVsIndexOffset("bpm_waveform_y_pos_raw", ax = ax_y, legend_keys = ['y raw']),
-           line_index.PlotLineVsIndexOffset("bpm_waveform_x_pos", ax = ax_xr, legend_keys = ['x']),
-           line_index.PlotLineVsIndexOffset("bpm_waveform_y_pos", ax = ax_yr, legend_keys = ['y']),
+           line_index.PlotLine("bpm_waveform_x_pos", "bpm_waveform_ds", ax = ax_x, legend_keys = ['x']),
+           line_index.PlotLine("bpm_waveform_y_pos", "bpm_waveform_ds", ax = ax_y, legend_keys = ['y']),
+           line_index.PlotLine("bpm_c_waveform_x_pos", "bpm_c_waveform_ds", ax = ax_x, legend_keys = ['x c'], marker = '.'),
+           line_index.PlotLine("bpm_c_waveform_y_pos", "bpm_c_waveform_ds", ax = ax_y, legend_keys = ['y c'], marker = '.'),
+           line_index.PlotLineVsIndex("bpm_waveform_x_pos_raw", ax = ax_xr, legend_keys = ['x raw']),
+           line_index.PlotLineVsIndex("bpm_waveform_y_pos_raw", ax = ax_yr, legend_keys = ['y raw']),
            line_index.PlotLineVsIndex("bpm_waveform_status", ax = ax_s, legend_keys = ['stat']),
        ]
     )
@@ -117,6 +108,8 @@ def main():
 
 if __name__ == '__main__':
     plt.ion()
-    main()
+    n_rep = 1
+    for i in range(n_rep):
+        main()
     plt.ioff()
     plt.show()
