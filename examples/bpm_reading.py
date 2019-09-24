@@ -32,7 +32,7 @@ def main():
        Fix gain treatment
     '''
     # Repeat the measurement 5 times
-    n_meas = 1
+    n_meas = 5000
 
     # The frequency range
     f0 = 10
@@ -45,11 +45,6 @@ def main():
     # bpm.waveform.x.gain.value = 1
     # bpm.waveform.y.gain.value = 1
 
-    bpm_c = BPMStorageRing(name = "bpm_c")
-    del bpm_c.waveform.packed_data
-    bpm_c_waveform.packed_data = bpm._waveform.packed_data
-    bpm_c.waveform.x.gain.value = 1
-    bpm_c.waveform.y.gain.value = 1
     cs = sim.motor2
 
     # cs.inform_set_done = bpm.waveform.new_trigger
@@ -64,7 +59,7 @@ def main():
 
     #print (bpm.trigger())
     #print (bpm.waveform.ready.read())
-    det = [bpm, bpm_c]
+    det = [bpm]
 
     bec = bc.best_effort.BestEffortCallback()
 
@@ -95,13 +90,11 @@ def main():
     ax_yr = plt.subplot(224)
     RE(bp.scan_nd(det, sw_freq * repeat),
        [
-           line_index.PlotLine("bpm_waveform_x_pos", "bpm_waveform_ds", ax = ax_x, legend_keys = ['x']),
-           line_index.PlotLine("bpm_waveform_y_pos", "bpm_waveform_ds", ax = ax_y, legend_keys = ['y']),
-           line_index.PlotLine("bpm_c_waveform_x_pos", "bpm_c_waveform_ds", ax = ax_x, legend_keys = ['x c'], marker = '.'),
-           line_index.PlotLine("bpm_c_waveform_y_pos", "bpm_c_waveform_ds", ax = ax_y, legend_keys = ['y c'], marker = '.'),
-           line_index.PlotLineVsIndex("bpm_waveform_x_pos_raw", ax = ax_xr, legend_keys = ['x raw']),
-           line_index.PlotLineVsIndex("bpm_waveform_y_pos_raw", ax = ax_yr, legend_keys = ['y raw']),
-           line_index.PlotLineVsIndex("bpm_waveform_status", ax = ax_s, legend_keys = ['stat']),
+           line_index.PlotLineOffset("bpm_waveform_x_pos", "bpm_waveform_ds", ax = ax_x, legend_keys = ['x']),
+           line_index.PlotLineOffset("bpm_waveform_y_pos", "bpm_waveform_ds", ax = ax_y, legend_keys = ['y']),
+           line_index.PlotLineVsIndexOffset("bpm_waveform_x_pos_raw", ax = ax_xr, legend_keys = ['x raw']),
+           line_index.PlotLineVsIndexOffset("bpm_waveform_y_pos_raw", ax = ax_yr, legend_keys = ['y raw']),
+           line_index.PlotLineVsIndexOffset("bpm_waveform_status", ax = ax_s, legend_keys = ['stat']),
        ]
     )
 
