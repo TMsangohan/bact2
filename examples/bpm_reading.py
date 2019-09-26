@@ -88,15 +88,24 @@ def main():
     ax_y  = plt.subplot(222)
     ax_xr = plt.subplot(223)
     ax_yr = plt.subplot(224)
-    RE(bp.scan_nd(det, sw_freq * repeat),
-       [
-           line_index.PlotLineOffset("bpm_waveform_x_pos", "bpm_waveform_ds", ax = ax_x, legend_keys = ['x']),
-           line_index.PlotLineOffset("bpm_waveform_y_pos", "bpm_waveform_ds", ax = ax_y, legend_keys = ['y']),
-           line_index.PlotLineVsIndexOffset("bpm_waveform_x_pos_raw", ax = ax_xr, legend_keys = ['x raw']),
-           line_index.PlotLineVsIndexOffset("bpm_waveform_y_pos_raw", ax = ax_yr, legend_keys = ['y raw']),
-           line_index.PlotLineVsIndexOffset("bpm_waveform_status", ax = ax_s, legend_keys = ['stat']),
-       ]
-    )
+
+    plots_offset  = [
+        line_index.PlotLineOffset("bpm_waveform_x_pos", "bpm_waveform_ds", ax = ax_x, legend_keys = ['x']),
+        line_index.PlotLineOffset("bpm_waveform_y_pos", "bpm_waveform_ds", ax = ax_y, legend_keys = ['y']),
+        line_index.PlotLineVsIndexOffset("bpm_waveform_x_pos_raw", ax = ax_xr, legend_keys = ['x raw']),
+        line_index.PlotLineVsIndexOffset("bpm_waveform_y_pos_raw", ax = ax_yr, legend_keys = ['y raw']),
+        line_index.PlotLineVsIndexOffset("bpm_waveform_status", ax = ax_s, legend_keys = ['stat']),
+    ]
+
+    plots  = [
+        line_index.PlotLine("bpm_waveform_x_pos", "bpm_waveform_ds", ax = ax_x, legend_keys = ['x']),
+        line_index.PlotLine("bpm_waveform_y_pos", "bpm_waveform_ds", ax = ax_y, legend_keys = ['y']),
+        line_index.PlotLineVsIndex("bpm_waveform_x_pos_raw", ax = ax_xr, legend_keys = ['x raw']),
+        line_index.PlotLineVsIndex("bpm_waveform_y_pos_raw", ax = ax_yr, legend_keys = ['y raw']),
+        line_index.PlotLineVsIndex("bpm_waveform_status", ax = ax_s, legend_keys = ['stat']),
+    ]
+
+    RE(bp.scan_nd(det, sw_freq * repeat), plots)
 
 
 if __name__ == '__main__':
