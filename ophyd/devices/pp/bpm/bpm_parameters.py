@@ -25,11 +25,6 @@ def create_bpm_config():
         * `x_offset`: offset in x axis
         * `y_offset`: offset in y axis
 
-
-    Todo:
-        Define how to treat scale and offset. Please note that
-        :mod:Ophyd uses :meth:`DerivedSignal.inverse` to derive the
-        physical data from the raw readings of the device.
     '''
 
     dtypes = np.dtype({
