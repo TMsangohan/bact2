@@ -21,19 +21,19 @@ class LifetimeSignal( Device ):
     It will use the last `readings_to_sum` values for this purpose.
 
     Warning:
-        This device expects to be suspended during injection. It 
-        uses the methods :meth:`suspend` and :meth:`resume` to 
-        restart the current readings. 
-    
+        This device expects to be suspended during injection. It
+        uses the methods :meth:`suspend` and :meth:`resume` to
+        restart the current readings.
 
-    Typically the device will be registered to be suspended if 
+
+    Typically the device will be registered to be suspended if
     time for next injection falls below a few seconds.
     '''
     current_readings = Cpt(Signal, name = 'currents',     value = [])
     min_readings     = Cpt(Signal, name = 'min_readings', value = 8)
 
     readings_to_sum  = Cpt(Signal, name = 'readings_to_sum', value = 10)
-    
+
     lt     = Cpt(Signal, name = 'lifetime',       value = np.nan)
     lt_err = Cpt(Signal, name = 'lifetime_error', value = np.nan)
 
@@ -59,7 +59,7 @@ class LifetimeSignal( Device ):
         rdbk = self.current_signal.readback
         value = rdbk.value
         timestamp = rdbk.timestamp
-        
+
         check = rdbk.read()
 
         a = np.array([timestamp, value])

@@ -7,5 +7,3 @@ class LifeTime( Device ):
     '''
     #: ten seconds average
     life_time_10 = Cpt(EpicsSignalRO, 'CUMZD4R:rdLt10')
-
-
