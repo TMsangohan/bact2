@@ -1,3 +1,8 @@
+'''
+
+Todo:
+    Make a separate module for calculational elements
+'''
 from bact.applib.lifetime.lifetime_calculate import fit_scaled_exp
 from ..raw.beam import BeamCurrent
 from ophyd import Component as Cpt, Device, EpicsSignalRO, Signal
@@ -7,6 +12,23 @@ from collections import deque
 
 
 class LifetimeSignal( Device ):
+    '''Deduce lifetime from last measured currents
+
+    This device will record the current readings and add them up.
+    After `min_readings` it will start to emmit an estimate of the
+    lifetime next to its error estimate.
+
+    It will use the last `readings_to_sum` values for this purpose.
+
+    Warning:
+        This device expects to be suspended during injection. It 
+        uses the methods :meth:`suspend` and :meth:`resume` to 
+        restart the current readings. 
+    
+
+    Typically the device will be registered to be suspended if 
+    time for next injection falls below a few seconds.
+    '''
     current_readings = Cpt(Signal, name = 'currents',     value = [])
     min_readings     = Cpt(Signal, name = 'min_readings', value = 8)
 
