@@ -10,7 +10,7 @@ from ophyd.status import DeviceStatus, AndStatus
 
 from ...raw import bpm as bpm_raw
 from ...utils import process_vector
-from ...utils.derived_signal import DerivedSignalLinear
+from ...utils.derived_signal import DerivedSignalLinearBPM
 from .bpm_parameters import create_bpm_config
 
 import numpy as np
@@ -67,17 +67,29 @@ class BPMStatusBits(enum.IntEnum):
     live = 7
 
 
-class BPMChannelScale( DerivedSignalLinear ):
-    ''' Reduce repetition of typing for
-    * gain
-    * bit_gain
-    * offset
+class BPMChannelScale( DerivedSignalLinearBPM ):
+    '''Values required for deriving BPM reading from raw signals
+
+    Derived signals require to be informed which signal name to use
+    as channel source. For the BPM's this recalculation is
+    implemented using a linear transformation. Please note that the
+    *inverse* transform is used to transform the read signals to
+    millimeters.
+
+    The following three signals are used:
+        * gain
+        * bit_gain
+        * offset
+
+    Compared to a
+    Reduce repetition of typing for
+
     '''
     def __init__(self, *args, **kwargs):
 
         for sig_name in ['gain', 'bit_gain', 'offset']:
             kwargs.setdefault('parent_{}_attr'.format(sig_name), sig_name)
-        
+
         super().__init__(*args, **kwargs)
 
 class BPMChannel( Device ):
@@ -92,13 +104,13 @@ class BPMChannel( Device ):
         * rms:      the rms of the actual position
         * pos_raw:  raw reading of the position
         * rms_raw:  rms of the raw reading
-        * gain:     a vector for rescaling the device from 
+        * gain:     a vector for rescaling the device from
         * bit_gain: a rough scale from mm to bit
 
     Warning:
         Let :class:`BPMWavefrom` use it
         It is the users responsibility to set the gains correctly!
-        
+
     '''
 
     _default_config_attrs = ('gain', 'offset', 'scale')
@@ -107,7 +119,7 @@ class BPMChannel( Device ):
     pos_raw = Cpt(Signal, name = 'pos_raw')
     #: and its rms value
     rms_raw = Cpt(Signal, name = 'rms_raw')
-    
+
     #: gains for the channels
     gain   = Cpt(Signal, name = 'gain', value = 1.0)
     offset = Cpt(Signal, name = 'offset', value = 0.0)
@@ -151,7 +163,7 @@ class BPMWaveform(  bpm_raw.BPMPackedData ):
     ds      = Cpt(Signal, name = 'ds', value = np.nan)
     names   = Cpt(Signal, name = 'names', value = [])
     indices = Cpt(Signal, name = 'indices', value = [])
-    
+
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
@@ -161,7 +173,7 @@ class BPMWaveform(  bpm_raw.BPMPackedData ):
 
         self.setConfigData()
 
-    def setConfigData(self):        
+    def setConfigData(self):
         rec = create_bpm_config()
         self.names.put(rec['name'])
         self.ds.put(rec['ds'])
@@ -171,7 +183,7 @@ class BPMWaveform(  bpm_raw.BPMPackedData ):
         self.y.gain.put(rec['y_scale'])
         self.x.offset.put(rec['x_offset'])
         self.y.offset.put(rec['y_offset'])
-        
+
     def storeDataInWaveforms(self, mat):
         """Store row vectors to the appropriate signals
 
@@ -193,11 +205,11 @@ class BPMWaveform(  bpm_raw.BPMPackedData ):
 
 
     def checkAndStorePackedData(self, packed_data):
-        
+
         indices = self.indices.value
         if len(indices) == 0:
             indices = None
-            
+
         mat = unpack_and_validate_data(packed_data, n_valid_items = self.n_valid_bpms,
                                        indices = indices)
         return self.storeDataInWaveforms(mat)
