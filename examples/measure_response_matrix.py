@@ -1,5 +1,7 @@
 """Measure the response matrix
 """
+# import logging
+# logging.basicConfig(level = 'INFO')
 import matplotlib
 matplotlib.use("Qt5Agg")
 import matplotlib.pyplot as plt
@@ -66,6 +68,7 @@ def main():
 
     # The figures for x and y ... on top of each other
     fig1 = plt.figure(1, figsize=[16,12])
+    # fig1 = plt.figure(1, figsize=[4,3])
     ax1 = plt.subplot(221)
     ax1.grid(True)
     ax2 = plt.subplot(222)
@@ -96,7 +99,7 @@ def main():
 
     RE = RunEngine({})
     # RE.log.setLevel("DEBUG")
-    RE.log.setLevel("INFO")
+    # RE.log.setLevel("INFO")
 
 
     bec = BestEffortCallback()
@@ -115,7 +118,7 @@ def main():
 
 
     RE.log.info('Starting to execute plan')
-    det = [bpm, col.selected, col.sel.dev]
+    det = [bpm] #, col.selected, col.sel.dev]
 
     h_st = steerers.horizontal_steerer_names
     v_st = steerers.vertical_steerer_names
@@ -130,12 +133,13 @@ def main():
         num = 1
 
 
+    comment = 'Data taking seems to work now. First run over all steerers (except for dipole steerers'
     md = {
         'operator' : 'Pierre Begemothovitsch',
         'target' : 'loco development',
         'step' : 'testing data base storge',
         'try_scan' : try_scan,
-        'comment' : 'first try to scan over all steerers and inject it into the database'
+        'comment' : comment
     }
 
     runs = RE(

@@ -103,11 +103,12 @@ class BPMComparisonPlot( LivePlot ):
 
 
 class _BPMPlots( line_index.PlotLineVsIndexOffset):
+    '''BPM Plots default to ring position as independent variable
+    '''
     def __init__(self, *args, **kwargs):
         kwargs.setdefault('x', 'bpm_waveform_ds')
         super().__init__(*args, **kwargs)
 
-        
         try:
             self.log
         except AttributeError:
@@ -119,9 +120,6 @@ class BPMOrbitOffsetPlot( _BPMPlots ):
     As orbit the first measured reference is taken. This is handled by
     :class:`PlotLineVsIndexOffset`
     '''
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.offset_set = None
 
 class BPMOffsetPlot(  _BPMPlots ):
     '''Show orbit change dues to steerer settings change
@@ -137,18 +135,25 @@ class BPMOffsetPlot(  _BPMPlots ):
         self.selected_steerer_name = selected_steerer_name
         self.selected_steerer = None
 
-    def event(self, doc):
-        data = doc['data']
+    def trace_used_steerer(self, doc):
 
-        selected_steerer = data[self.selected_steerer_name]
         # print('bpm offset plot event["data"].keys()= {}'.format(data.keys()))
         # print('selected_sterrer: {}'.format(selected_steerer))
 
-        assert(selected_steerer is not None)
+        data = doc['data']
+        try:
+            selected_steerer = data[self.selected_steerer_name]
+        except KeyError as ke:
+            txt = 'Selected steerer could not be found by name "{}"'
+            self.log.error(txt.format(self.selected_steerer_name))
+            return
+
         if selected_steerer != self.selected_steerer:
             txt = 'Resetting plot as selected steerer switches from {} to {}'
             self.log.info(txt.format(self.selected_steerer, selected_steerer))
             self.offset.clearOffset()
             self.selected_steerer = selected_steerer
 
+    def event(self, doc):
+        self.trace_used_steerer(doc)
         return super().event(doc)
