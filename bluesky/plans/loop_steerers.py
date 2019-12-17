@@ -12,8 +12,7 @@ logger = logging.getLogger('bact2')
 # Currents cycle ... respect hysteresis
 current_signs = np.array([0, 1, -1, 0])
 
-def step_steerer(steerer, currents, detectors, num_readings,
-                 bpm_x_o = None, bpm_y_o = None):
+def step_steerer(steerer, currents, detectors, num_readings):
     """
 
     Todo:
@@ -34,9 +33,12 @@ def step_steerer(steerer, currents, detectors, num_readings,
         # Let's check if the first reading of the bpm is really useful
         # I guess first reading is too fast!
         # So first let's clear the offset plots
-        [p.clearOffset() for p in (bpm_x_o, bpm_y_o) if p is not None]
+        # This is now handled by the BPM plot itself ...
+
         for i in range(num_readings):
             yield from bps.trigger_and_read(detectors)
+            # bps.read(detectors)
+
 
 def loop_steerers(detectors, col, num_readings = 1, md = None,
                   horizontal_steerer_names = None, vertical_steerer_names = None,
@@ -68,8 +70,8 @@ def loop_steerers(detectors, col, num_readings = 1, md = None,
     def _run_all():
         """Iterate over vertical and horizontal steerers
 
-        Get 
-        """            
+        Get
+        """
         # Lets do first the horizontal steerers and afterwards
         # lets get all vertial steerers
 
@@ -88,4 +90,3 @@ def loop_steerers(detectors, col, num_readings = 1, md = None,
 
 
     return (yield from _run_all())
-

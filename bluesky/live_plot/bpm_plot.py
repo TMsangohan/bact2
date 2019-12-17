@@ -1,15 +1,19 @@
 '''Plots for comparing the different bpm data
 
 '''
+import logging
+from .import line_index
 from collections import ChainMap
 from bluesky.callbacks import LivePlot
 import numpy as np
+
+logger = logging.getLogger('bact2')
 
 class BPMComparisonPlot( LivePlot ):
     '''
 
     Todo:
-        Investigate is such a plot should be provided for steerers too
+        Investigate if such a plot should be provided for steerers too
     '''
     def __init__(self, *args, bpm_names = None, bpm_positions = None, **kwargs):
 
@@ -95,3 +99,56 @@ class BPMComparisonPlot( LivePlot ):
         self.x_data = list(self.x_data)
         self.y_data = list(self.y_data)
         super().stop(doc)
+
+
+
+class _BPMPlots( line_index.PlotLineVsIndexOffset):
+    def __init__(self, *args, **kwargs):
+        kwargs.setdefault('x', 'bpm_waveform_ds')
+        super().__init__(*args, **kwargs)
+
+        
+        try:
+            self.log
+        except AttributeError:
+            self.log = logger
+
+class BPMOrbitOffsetPlot( _BPMPlots ):
+    '''Plot offset to orbit
+
+    As orbit the first measured reference is taken. This is handled by
+    :class:`PlotLineVsIndexOffset`
+    '''
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.offset_set = None
+
+class BPMOffsetPlot(  _BPMPlots ):
+    '''Show orbit change dues to steerer settings change
+
+    When the selected steerer name changes the offset is reset
+    '''
+    def __init__(self, *args, selected_steerer_name = None, **kwargs):
+        super().__init__(*args, **kwargs)
+
+        if selected_steerer_name is None:
+            selected_steerer_name = 'sc_selected'
+
+        self.selected_steerer_name = selected_steerer_name
+        self.selected_steerer = None
+
+    def event(self, doc):
+        data = doc['data']
+
+        selected_steerer = data[self.selected_steerer_name]
+        # print('bpm offset plot event["data"].keys()= {}'.format(data.keys()))
+        # print('selected_sterrer: {}'.format(selected_steerer))
+
+        assert(selected_steerer is not None)
+        if selected_steerer != self.selected_steerer:
+            txt = 'Resetting plot as selected steerer switches from {} to {}'
+            self.log.info(txt.format(self.selected_steerer, selected_steerer))
+            self.offset.clearOffset()
+            self.selected_steerer = selected_steerer
+
+        return super().event(doc)
