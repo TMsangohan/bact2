@@ -9,7 +9,7 @@ from .steerer_list import horizontal_steerers, vertical_steerers
 import numpy as np
 
 import logging
-logger = logging.getLogger()
+logger = logging.getLogger('bact2')
 
 all_steerers = horizontal_steerers + vertical_steerers
 t_steerers = [(name.lower(), name) for name in all_steerers]
@@ -91,7 +91,7 @@ class Steerer( PowerConverter ):
 
 
 class _SelectedSteerer( Device ):
-    setpoint = Cpt(SignalProxy, name='set', value = np.nan, kind = 'normal', lazy = False)
+    setpoint = Cpt(SignalProxy, name='set',  value = np.nan, kind = 'hinted', lazy = False)
     readback = Cpt(SignalProxy, name='rdbk', value = np.nan, kind = 'hinted', lazy = False)
 
     def __init__(self, *args, **kwargs):
@@ -149,7 +149,7 @@ class SteererCollection( Device ):
               default_read_attrs = (),
     )
 
-    selected = Cpt(Signal, name='selected', value ='none selected', kind='normal')
+    selected = Cpt(Signal, name='selected', value ='none selected')
     sel = Cpt(SelectedSteerer, name = 'sel_st')
 
 
@@ -180,7 +180,8 @@ class SteererCollection( Device ):
         """
         self.log.info("Selecting steerer {}".format(name))
         self._setSteererByName(name)
-        status = self.selected.set(name)
+        name = str(t_name)
+        status = self.selected.set(t_name)
         return status
 
 
