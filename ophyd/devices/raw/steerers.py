@@ -1,3 +1,12 @@
+'''Steerer collection and steerer as multiplexer
+
+Todo:
+   * Implement stop / resume method. When the program is stopped
+     by the user, the steerer should finish the hysteresis loop
+
+
+
+'''
 from ophyd import Signal, Device, Component as Cpt
 from ophyd.areadetector.base import ad_group
 from ophyd.device import  DynamicDeviceComponent as DDC
@@ -67,11 +76,14 @@ class SignalProxy( Signal ):
         # print(proxy_name, self.name)
         r = sig.read()
         d = {}
+        # It is essential not to return the data also for the selected steerer
+        # as the database will choke afterwards as it can not find the names
         for key, item in r.items():
             if key == proxy_name:
                 key2 = self.name
                 d[key2] = item
-            d[key] = item
+            else:
+                d[key] = item
         fmt = "{}.read returns {}"
         self.log.debug(fmt.format(self.name, d))
         return d
@@ -129,6 +141,14 @@ class _SelectedSteerer( Device ):
         status = AndStatus(st_set, st_rbk)
         return status
 
+
+    def read(self):
+        r = super().read()
+        tup = self.__class__.__name__, __name__, r
+        txt = '{}:{}.read() returns = {}'.format(*tup)
+        self.log.debug(txt)
+        return r
+
     def __del__(self):
         self.unsubscribeSelected()
 
@@ -142,6 +162,7 @@ class SelectedSteerer( Device ):
 
     def trigger(self):
         return self.dev.trigger()
+
 
 class SteererCollection( Device ):
     steerers = DDC(ad_group(Steerer, t_steerers),
@@ -180,7 +201,7 @@ class SteererCollection( Device ):
         """
         self.log.info("Selecting steerer {}".format(name))
         self._setSteererByName(name)
-        name = str(t_name)
+        t_name = str(name)
         status = self.selected.set(t_name)
         return status
 

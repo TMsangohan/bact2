@@ -63,11 +63,26 @@ def select_step_steerer(col, name, currents, *args, **kws):
 def loop_steerers(detectors, col, num_readings = 1, md = None,
                   horizontal_steerer_names = None, vertical_steerer_names = None,
                   current_val_horizontal = None, current_val_vertical = None,
+                  current_steps = None,
                   **kws):
     """
+
+    Warning:
+          If the user defines current_steps, it is the users
+          responsibility to ensure that these close
+
+    Todo:
+         Consider current steps, current vals etc best to be
+         generators
     """
     # col_info = [col.selected.name, col.sel.name]
     # col_info = [col.selected.name]
+
+    if current_steps is None:
+        current_steps = current_signs
+    else:
+        current_steps = np.asarray(current_steps)
+
     _md = {'detectors': [det.name for det in detectors],
           'num_readings': num_readings,
           'plan_args': {
@@ -76,7 +91,8 @@ def loop_steerers(detectors, col, num_readings = 1, md = None,
               'horizontal_steerer_names' : horizontal_steerer_names,
               'vertical_steerer_names'   : vertical_steerer_names,
               'current_val_horizontal'   : current_val_horizontal,
-              'current_val_vertical'     : current_val_vertical
+              'current_val_vertical'     : current_val_vertical,
+              'current_steps'            : current_steps,
           },
           'plan_name': 'response_matrix',
           'hints': {}
@@ -103,12 +119,12 @@ def loop_steerers(detectors, col, num_readings = 1, md = None,
         # Lets do first the horizontal steerers and afterwards
         # lets get all vertial steerers
 
-        currents = current_val_horizontal * current_signs
+        currents = current_val_horizontal * current_steps
         for name in horizontal_steerer_names:
             logger.info('Selecting steerer {}'.format(name))
             yield from select_step_steerer(col, name, currents, detectors_all, num_readings, **kws)
 
-        currents = current_val_vertical * current_signs
+        currents = current_val_vertical * current_steps
         for name in vertical_steerer_names:
             logger.info('Selecting steerer {}'.format(name))
             yield from select_step_steerer(col, name, currents, detectors_all, num_readings, **kws)

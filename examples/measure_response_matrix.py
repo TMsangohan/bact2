@@ -9,9 +9,9 @@ import matplotlib.pyplot as plt
 from bluesky.utils import ProgressBarManager, install_qt_kicker
 from bluesky import RunEngine
 from bluesky.callbacks.best_effort import BestEffortCallback
+import bluesky.preprocessors as bpp
 
-
-from bact2.ophyd.devices.raw import steerers
+from bact2.ophyd.devices.raw import steerers, beam
 from bact2.ophyd.devices.pp.bpm import BPMStorageRing
 from bact2.bluesky.live_plot import line_index
 from bact2.bluesky.live_plot.bpm_plot import BPMOffsetPlot, BPMOrbitOffsetPlot
@@ -21,9 +21,7 @@ from bact2.bluesky.plans.loop_steerers import loop_steerers
 # from bact2.suitcase.serializer import Serializer
 from databroker import Broker
 
-
-
-
+import numpy as np
 
 
 def main():
@@ -33,7 +31,6 @@ def main():
     """
     col = steerers.SteererCollection(name = "sc")
     bpm = BPMStorageRing(name = "bpm")
-
 
 
     # print(bpm.describe())
@@ -98,6 +95,7 @@ def main():
 
 
     RE = RunEngine({})
+
     # RE.log.setLevel("DEBUG")
     # RE.log.setLevel("INFO")
 
@@ -115,7 +113,11 @@ def main():
     # serializer = Serializer()
     # s_id = RE.subscribe(serializer)
 
-
+    # bm = beam.Beam(name = 'beam')
+    # sd = bpp.SupplementalData(
+    #    monitors = [bm]
+    # )
+    # RE.preprocessors.append(sd)
 
     RE.log.info('Starting to execute plan')
     det = [bpm] #, col.selected, col.sel.dev]
@@ -123,7 +125,7 @@ def main():
     h_st = steerers.horizontal_steerer_names
     v_st = steerers.vertical_steerer_names
 
-    num = 2
+    num = 4
 
     try_scan = False
 
@@ -133,23 +135,29 @@ def main():
         num = 1
 
 
-    comment = 'Data taking seems to work now. First run over all steerers (except for dipole steerers'
+    comment = 'Data taking seems to work now. First run over all steerers (except for dipole steerers)'
+    comment = 'Data taking seems to work now. Trying to run more than only the extrma 0, + I . -I, 0'
     md = {
         'operator' : 'Pierre Begemothovitsch',
         'target' : 'loco development',
         'step' : 'testing data base storge',
         'try_scan' : try_scan,
         'comment' : comment
+
     }
 
+    current_steps = np.array([0, .5, 1, .5, -.5, -1, -.5, 0])
     runs = RE(
         loop_steerers(det, col, horizontal_steerer_names = h_st, vertical_steerer_names = v_st, num_readings = num,
                       current_val_horizontal = current_val_horizontal, current_val_vertical = current_val_vertical,
+                      current_steps = current_steps
         ),
         plots,
         md = md
     )
-    RE.log.info('Executed runs {}'.format(runs))
+    txt = 'Executed runs {}'.format(runs)
+    print(txt)
+    RE.log.info(txt)
 
     #serializer.closeServer()
     #RE.unsubscribe(s_id)
