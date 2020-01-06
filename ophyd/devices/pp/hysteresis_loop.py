@@ -9,7 +9,7 @@ import enum
 logger = logging.getLogger('bact2')
 
 
-def compare_value(value, reference_value, *,  eps_abs = None, eps_rel = None):
+def compare_value(value, reference_value, *, eps_abs=None, eps_rel=None):
     '''compare if values are equal within given limits
 
     Todo:
@@ -28,11 +28,12 @@ def compare_value(value, reference_value, *,  eps_abs = None, eps_rel = None):
     if adiff <= allowed_diff:
         return 0
     elif diff > 0:
-         return 1
+        return 1
     else:
         return -1
 
     raise AssertionError('Should not end up here')
+
 
 class HystereisFollowState(super_state_machine.machines.StateMachine):
     """States when following a hysteresis loop
@@ -42,12 +43,12 @@ class HystereisFollowState(super_state_machine.machines.StateMachine):
         """
         #: e.g. at start up
         UNKNWON = 'unknown'
-        #: Ramping up 
+        #: Ramping up
         RAMP_UP = 'ramp_up'
         #: Ramping down
         RAMP_DOWN = 'ramp_down'
         # Special treatment of the edges
-        #: top end 
+        #: top end
         TOP = 'top'
         #: bootom end
         BOTTOM = 'bottom'
@@ -59,15 +60,15 @@ class HystereisFollowState(super_state_machine.machines.StateMachine):
         transitions = {
             #: start to ramp up or down to get to
             #: leave unknwon state
-            'unknown'   : ['ramp_up', 'ramp_down', 'top', 'bottom', 'failed'],
+            'unknown'  : ['ramp_up', 'ramp_down', 'top', 'bottom', 'failed'],
             #: not tracking if sufficient number of cycles made
-            'ramp_up'   : ['top',       'failed'],
-            #: 
-            'ramp_down' : ['bottom',    'failed'],
-            'top'       : ['ramp_down', 'failed'],
-            'bottom'    : ['ramp_up',   'failed'],
-            #: 
-            'failed'    : ['unknown',   'failed'],
+            'ramp_up'  : ['top',       'failed'],
+            #:
+            'ramp_down': ['bottom',    'failed'],
+            'top'      : ['ramp_down', 'failed'],
+            'bottom'   : ['ramp_up',   'failed'],
+            #:
+            'failed'   : ['unknown',   'failed'],
          }
 
 
@@ -94,12 +95,10 @@ class HysteresisModel:
         assert(self._bottom_value is not None)
         return self._bottom_value
 
-
     @property
     def top_value(self):
         assert(self._top_value is not None)
         return self._top_value
-
 
     @property
     def current_value(self):
@@ -113,8 +112,8 @@ class HysteresisModel:
     def compareValue(self, value, reference_value):
         '''Compare if the value deviates significantls from the reference value
         '''
-        flag = compare_value(value, reference_value, 
-                    eps_abs=self.eps_abs, eps_rel=self.eps_rel)
+        flag = compare_value(value, reference_value,
+                             eps_abs=self.eps_abs, eps_rel=self.eps_rel)
         if flag not in (-1, 0, 1):
             raise AssertionError(f'Got invalid flag {flag}')
         return flag
@@ -157,7 +156,7 @@ class HysteresisModel:
         self.checkRange(current_value, bottom_value, top_value)
 
         if self.hysteresis_state.state == 'bottom':
-            flag_low  = self.compareValue(current_value, bottom_value)
+            flag_low = self.compareValue(current_value, bottom_value)
             if flag_low != 0:
                 txt = (
                     'Expected to be at bottom, but found not to be the case:' +
@@ -171,15 +170,15 @@ class HysteresisModel:
             flag_high = self.compareValue(current_value, top_value)
             if flag_high != 0:
                 txt = (
-                    'Expected to be at bottom, but found not to be the case:' + 
+                    'Expected to be at bottom, but found not to be the case:' +
                     f' current_value {current_value} !=' +
                     f' top_value {top_value}: flag {flag_high}'
                 )
                 raise errors.OutOfRangeError(txt)
 
         else:
-            # No check for any other state. That the value is 
-            # within range has been checked above by 
+            # No check for any other state. That the value is
+            # within range has been checked above by
             # self.checkRange
             pass
 
@@ -191,11 +190,11 @@ class HysteresisModel:
         self.checkConsistency()
 
     def toValue(self, value):
-        '''returns values required to achive to get to the 
+        '''returns values required to achive to get to the
         requested value respecting the hysteresis loop
 
         Todo:
-            Who resets the state? 
+            Who resets the state?
         '''
 
         self.checkValue(value)
@@ -203,16 +202,16 @@ class HysteresisModel:
         flag = self.compareValue(value, self.current_value)
         if flag == 0:
             # Nothing to do ... hit value well enough ....
-            return 
+            return
 
         # checkConsistency checked if the current value matches the
         # state. Furthermore it was checked that requested value
         # deviates from the actual value by a significant amount
 
         state = self.hysteresis_state.state
-        if state in ( 'bottom', 'top'):
-            # At the bottom or top just directly to the value. 
-            # If to be on ramp up or ramp down is a task left 
+        if state in ('bottom', 'top'):
+            # At the bottom or top just directly to the value.
+            # If to be on ramp up or ramp down is a task left
             # to the user
             yield value
             return
@@ -262,6 +261,7 @@ class HysteresisModel:
 
         raise AssertionError('Not expected to end up here')
 
+
 class TracingHysteresisModel(HysteresisModel):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -301,7 +301,7 @@ class TracingHysteresisModel(HysteresisModel):
                 self.set_failed()
                 txt = (
                     f'In state {state}:' +
-                    f' requested value {value} < current_value {current_value}:'
+                    f' requested value {value} < current_value {current_value}' +
                     f': flag = {flag}'
                 )
                 raise errors.HysteresisFollowError(txt)
@@ -320,8 +320,3 @@ class TracingHysteresisModel(HysteresisModel):
             raise AssertionError(f'Not expected state {state}')
 
         raise AssertionError('Not expected to end up here')
-
-
-
-
-
