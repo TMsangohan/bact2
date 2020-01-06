@@ -1,6 +1,6 @@
 from ..utils import errors
 
-import super_state_machine
+import super_state_machine.machines
 import numpy as np
 import logging
 import enum
@@ -56,7 +56,7 @@ class HystereisFollowState(super_state_machine.machines.StateMachine):
         FAILED = 'failed'
 
     class Meta:
-        initial_state = "unkdnown"
+        initial_state = "unknown"
         transitions = {
             #: start to ramp up or down to get to
             #: leave unknwon state
@@ -78,11 +78,12 @@ class HysteresisModel:
     Provides:
         * tracing of the hysteresis loop
     '''
-    def __init__(self, *, eps_abs=1e-6, eps_rel=1e-6, log=None):
+    def __init__(self, *, bottom_value=None, top_value=None,
+                 eps_abs=1e-6, eps_rel=1e-6, log=None):
 
         self.hysteresis_state = HystereisFollowState()
-        self._bottom_value = None
-        self._top_value = None
+        self._bottom_value = bottom_value
+        self._top_value = top_value
 
         self.eps_abs = eps_abs
         self.eps_rel = eps_rel
@@ -90,19 +91,13 @@ class HysteresisModel:
             log = logger
         self.log = log
 
-    @property
-    def bottom_value(self):
+    def getBottomValue(self):
         assert(self._bottom_value is not None)
         return self._bottom_value
 
-    @property
-    def top_value(self):
+    def getTopValue(self):
         assert(self._top_value is not None)
         return self._top_value
-
-    @property
-    def current_value(self):
-        return self.getCurrentValue()
 
     def getCurrentValue(self):
         '''retreive the current value the power converter is at
@@ -150,9 +145,10 @@ class HysteresisModel:
             txt = 'Refusing to execute hysteresis cycle on failed machine'
             raise errors.DeviceError(txt)
 
-        current_value = self.current_value
-        top_value     = self.top_value
-        bottom_value  = self.bottom_value
+        current_value = self.getCurrentValue()
+        top_value     = self.getTopValue()
+        bottom_value  = self.getBottomValue()
+
         self.checkRange(current_value, bottom_value, top_value)
 
         if self.hysteresis_state.state == 'bottom':
@@ -184,8 +180,8 @@ class HysteresisModel:
 
     def checkValue(self, value):
 
-        bottom_value = self.bottom_value
-        top_value = self.top_value
+        bottom_value = self.getBottomValue()
+        top_value = self.getTopValue()
         self.checkRange(value, bottom_value, top_value)
         self.checkConsistency()
 
@@ -199,7 +195,7 @@ class HysteresisModel:
 
         self.checkValue(value)
         # Value in range and in a consistent state
-        flag = self.compareValue(value, self.current_value)
+        flag = self.compareValue(value, self.getCurrentValue())
         if flag == 0:
             # Nothing to do ... hit value well enough ....
             return
@@ -218,14 +214,14 @@ class HysteresisModel:
 
         elif state == 'ramp_up':
             if flag < 0:
-                yield self.top_value
+                yield self.getTopValue()
             yield value
             return
 
         elif state == 'ramp_down':
             if flag < 0:
                 # Need only to go up
-                yield self.bottom_value
+                yield self.getBottomValue()
             yield value
             return
 
@@ -237,8 +233,8 @@ class HysteresisModel:
 
         self.checkValue(value)
 
-        bottom_value = self.bottom_value
-        top_value = self.top_value
+        bottom_value = self.getBottomValue()
+        top_value = self.getTopValue()
 
         cycles = range(n_hysteresis_cycles)
 
@@ -293,7 +289,10 @@ class TracingHysteresisModel(HysteresisModel):
             self.set_failed()
             raise
 
-        current_value = self.current_value
+        current_value = self.getCurrentValue()
+        top_value     = self.getTopValue()
+        bottom_value  = self.getBottomValue()
+
         flag = self.compareValue(value, current_value)
         # Now just check that the request is correct
         if state in ('bottom', 'ramp_up'):
@@ -305,7 +304,7 @@ class TracingHysteresisModel(HysteresisModel):
                     f': flag = {flag}'
                 )
                 raise errors.HysteresisFollowError(txt)
-            return
+
         elif state in ('top', 'ramp_down'):
             if flag > 0:
                 self.set_failed()
@@ -315,8 +314,38 @@ class TracingHysteresisModel(HysteresisModel):
                     f': flag = {flag}'
                 )
                 raise errors.HysteresisFollowError(txt)
-            return
         else:
             raise AssertionError(f'Not expected state {state}')
 
-        raise AssertionError('Not expected to end up here')
+        # Flags match current state ... but to which state do we switch now?
+        # First handle the end points
+        if state == 'bottom':
+            if flag == 1:
+                self.hysteresis_state.set_ramp_up()
+        elif state == 'top':
+            if flag == -1:
+                self.hysteresis_state.set_ramp_down()
+
+        # Now let's check if one of the end points is reached ...
+
+        flag = self.compareValue(value, bottom_value)
+        if flag == 0 and state != 'bottom':
+            self.hysteresis_state.set_bottom()
+
+        flag = self.compareValue(value, top_value)
+        if flag == 0 and state != 'top':
+            self.hysteresis_state.set_top()
+
+    def startTracingRamp(self, start_state, reset_failed=True):
+
+        if start_state not in ('top', 'bottom', 'ramp_up', 'ramp_down'):
+            raise AssertionError(f'start state {start_state} unknown')
+
+        state_machine = self.hysteresis_state
+        if reset_failed:
+            if state_machine.is_failed:
+                state_machine.set_unknown()
+
+        method_name = f'set_{start_state}'
+        method = getattr(state_machine, method_name)
+        method()
