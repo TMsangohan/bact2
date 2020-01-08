@@ -50,6 +50,7 @@ horizontal_steerers = [
     ]
 
 vertical_steerers = [
+    'VS4P2T7R',
     'VS2P1D1R',
     'VS2P2D1R',
     'VS3P1D1R',
@@ -75,7 +76,6 @@ vertical_steerers = [
     'VS3P2D7R',
     'VS3P2T7R',
     'VS4P1T7R',
-    'VS4P2T7R',
     'VS2P1D8R',
     'VS2P1T8R',
     'VS2P2D8R',

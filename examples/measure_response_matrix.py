@@ -1,7 +1,7 @@
 """Measure the response matrix
 """
-# import logging
-# logging.basicConfig(level = 'INFO')
+import logging
+# logging.basicConfig(level = 'DEBUG')
 import matplotlib
 matplotlib.use("Qt5Agg")
 import matplotlib.pyplot as plt
@@ -9,9 +9,14 @@ import matplotlib.pyplot as plt
 from bluesky.utils import ProgressBarManager, install_qt_kicker
 from bluesky import RunEngine
 from bluesky.callbacks.best_effort import BestEffortCallback
+from bluesky.callbacks import LiveTable
+from bluesky.suspenders import SuspendFloor
 import bluesky.preprocessors as bpp
 
-from bact2.ophyd.devices.raw import steerers, beam
+from bact2.ophyd.devices.raw import beam, steerers, tunes
+from bact2.ophyd.devices.utils import book_keeping_dev
+# from bact2.ophyd.devices.pp import steerer
+
 from bact2.ophyd.devices.pp.bpm import BPMStorageRing
 from bact2.bluesky.live_plot import line_index
 from bact2.bluesky.live_plot.bpm_plot import BPMOffsetPlot, BPMOrbitOffsetPlot
@@ -31,8 +36,11 @@ def main():
     """
     col = steerers.SteererCollection(name = "sc")
     bpm = BPMStorageRing(name = "bpm")
+    tn = tunes.TuneMeasurement(name = 'tune')
 
+    t_beam = beam.Beam(name = 'beam')
 
+    # print(col.describe())
     # print(bpm.describe())
     # return
 
@@ -91,17 +99,22 @@ def main():
     ax3 = plt.subplot()
     bpm_s = line_index.PlotLineVsIndex("bpm_waveform_status",      ax = ax3, legend_keys = ['stat'])
 
-    plots = [bpm_x, bpm_y, bpm_s,  bpm_x_o, bpm_y_o]
+    bk_dev = book_keeping_dev.Bookkeeping(name='bk_dev')
+    bk_dev.mode.value = 'startup'
+
+    lt = LiveTable([col.selected, bk_dev.mode, bk_dev.current_offset, bk_dev.dI, bk_dev.scale_factor,  col.sel.dev.setpoint], default_prec=10)
+    plots = [bpm_x, bpm_y, bpm_s,  bpm_x_o, bpm_y_o] + [lt]
 
 
     RE = RunEngine({})
-
+    watch_beam = SuspendFloor(t_beam.current.readback, 1, resume_thresh = 2)
+    RE.install_suspender(watch_beam)
     # RE.log.setLevel("DEBUG")
     # RE.log.setLevel("INFO")
 
 
     bec = BestEffortCallback()
-    RE.subscribe(bec)
+    # RE.subscribe(bec)
 
     pbar = ProgressBarManager()
     RE.waiting_hook = pbar
@@ -120,44 +133,65 @@ def main():
     # RE.preprocessors.append(sd)
 
     RE.log.info('Starting to execute plan')
-    det = [bpm] #, col.selected, col.sel.dev]
+    det = [bpm,
+           tn,
+           col,
+           #bk_dev
+    ] #, col.selected, col.sel.dev]
 
     h_st = steerers.horizontal_steerer_names
     v_st = steerers.vertical_steerer_names
 
-    num = 4
-
+    n_st = len(h_st + v_st) 
+    num = 3
+    repeat = 2
     try_scan = False
 
+    n_st2 = n_st
     if try_scan:
         h_st = h_st[:2]
-        v_st = v_st[:2]
-        num = 1
+        v_st = v_st[:3]
+        #v_st = []
+        num = 2
+        repeat = 1
+        n_st2 = len(h_st + v_st) 
 
+    print(f'Total number of steeres {n_st} but  only executing using {n_st2}')
 
     comment = 'Data taking seems to work now. First run over all steerers (except for dipole steerers)'
-    comment = 'Data taking seems to work now. Trying to run more than only the extrma 0, + I . -I, 0'
+    comment = '''Data taking seems to work now. That's why I had looked into trying to optimze 
+    the current steps. Now data taking starts to get useful.
+    '''
+    comment = 'trying to run enough points to estimate the non linearity'
+
     md = {
         'operator' : 'Pierre Begemothovitsch',
         'target' : 'loco development',
-        'step' : 'testing data base storge',
+        'step' :  'second try of measurement campaign',
         'try_scan' : try_scan,
         'comment' : comment
 
     }
 
-    current_steps = np.array([0, .5, 1, .5, -.5, -1, -.5, 0])
-    runs = RE(
-        loop_steerers(det, col, horizontal_steerer_names = h_st, vertical_steerer_names = v_st, num_readings = num,
-                      current_val_horizontal = current_val_horizontal, current_val_vertical = current_val_vertical,
-                      current_steps = current_steps
-        ),
-        plots,
-        md = md
-    )
-    txt = 'Executed runs {}'.format(runs)
-    print(txt)
-    RE.log.info(txt)
+    current_steps = np.array([0, .25,  .5,   .75,  1,
+                                 .75,  .5,   .25,  0,
+                                -.25, -.5,  -.75, -1,
+                                -.75, -.5,  -.25,  0])
+    # current_steps = np.array([0, .5, 1, .5, -.5, -1, -.5, 0])
+    # current_steps = np.array([0, 1,  -1,  0])
+    for i in range(repeat):
+        runs = RE(
+            loop_steerers(det, col, horizontal_steerer_names = h_st, vertical_steerer_names = v_st, num_readings = num,
+                          current_val_horizontal = current_val_horizontal, current_val_vertical = current_val_vertical,
+                          current_steps = current_steps, dr_target=2,
+                          book_keeping_dev = bk_dev
+            ),
+            plots,
+            **md
+        )
+        txt = 'Cnt {} Executed runs {}'.format(repeat, runs)
+        print(txt)
+        RE.log.info(txt)
 
     #serializer.closeServer()
     #RE.unsubscribe(s_id)

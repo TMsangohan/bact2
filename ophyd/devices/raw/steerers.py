@@ -8,6 +8,7 @@ Todo:
 
 '''
 from ophyd import Signal, Device, Component as Cpt
+from ophyd.ophydobj import Kind
 from ophyd.areadetector.base import ad_group
 from ophyd.device import  DynamicDeviceComponent as DDC
 from ophyd.status import AndStatus
@@ -22,6 +23,7 @@ logger = logging.getLogger('bact2')
 
 all_steerers = horizontal_steerers + vertical_steerers
 t_steerers = [(name.lower(), name) for name in all_steerers]
+t_steerer_names = [entry[0] for entry in t_steerers]
 
 horizontal_steerer_names = [name.lower() for name in horizontal_steerers]
 vertical_steerer_names   = [name.lower() for name in vertical_steerers]
@@ -35,11 +37,13 @@ class SignalProxy( Signal ):
         super().__init__(*args, **kwargs)
         self.__signal_to_proxy = None
 
+
     @property
     def signal_to_proxy(self):
         if self.__signal_to_proxy is None:
             raise AssertionError("No signal to proxy found in {}".format(self.name))
         return self.__signal_to_proxy
+
 
     @signal_to_proxy.setter
     def signal_to_proxy(self, sig):
@@ -53,6 +57,16 @@ class SignalProxy( Signal ):
     def remove_proxy_signal(self):
         self.__signal_to_proxy = None
 
+    @property
+    def limits(self):
+        return self.signal_to_proxy.limits
+
+        p = self.__signal_to_proxy
+        if p is None:
+            limits = [-0.0, 0.0]
+        else:
+            limits =self.signal_to_proxy.limits
+        return limits
 
     def set(self, *args, **kwargs):
         sig = self.signal_to_proxy
@@ -165,15 +179,15 @@ class SelectedSteerer( Device ):
 
 
 class SteererCollection( Device ):
-    steerers = DDC(ad_group(Steerer, t_steerers),
-        doc='all steerers',
-              default_read_attrs = (),
+    steerers = DDC(ad_group(Steerer, t_steerers, kind=Kind.normal, lazy=False),
+        doc='all steerers', default_read_attrs = ()#tuple(t_steerer_names),
     )
-
+    steerer_names = Cpt(Signal, name='steerer_names', value=t_steerer_names, kind=Kind.config)
     selected = Cpt(Signal, name='selected', value ='none selected')
     sel = Cpt(SelectedSteerer, name = 'sel_st')
 
-
+    _default_config_attrs = ('steerer_names',)
+    _default_read_attrs = ('selected', 'sel') #+ tuple(['steerers.' + name for name in t_steerer_names])
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self._setDefaultSteerer()
