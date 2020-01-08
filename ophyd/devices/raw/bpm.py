@@ -5,7 +5,7 @@ A higher level of access is provided by
 """
 from ophyd import Component as Cpt, EpicsSignalRO
 from ophyd import Device
-from ophyd.status import SubscriptionStatus
+from ophyd.status import SubscriptionStatus, AndStatus
 from ...utils.status.ExpectedValueStatus import ExpectedValueStatus
 
 class BPMStatistics( Device ):
@@ -47,22 +47,50 @@ class BPMPackedData( Device ):
 
     def trigger(self):
         """Inform the measurement state engine that measurement starts
+
+
+        ensure that ready falls off. Only then accept packed data
+
+        Todo:
+            Check if assumptions are correct...
         """
         # Inform the measurement state engine that data acquistion
         # starts
+
+
+        ready_negative_edge_triggered = False
+        def trigger_falling(value = None, old_value = None, **kwargs):
+            '''waiting for falling edge trigger of ready
+            '''
+            nonlocal ready_negative_edge_triggered
+
+            old_value = bool(old_value)
+            value = bool(value)
+
+            if old_value and not value:
+                ready_negative_edge_triggered = True
+                return True
+            return False
 
 
         def cb(**kwargs):
             """Wait for new data
 
             If this data is here we are done ...
+
+            All this nice checks do not work
             """
             return True
 
-        t_cls = SubscriptionStatus
-        t_cls = ExpectedValueStatus
-        status = t_cls(self.packed_data, cb, timeout = self.bpm_timeout, run = False)
-        return status
+            nonlocal ready_negative_edge_triggered
+            if ready_negative_edge_triggered:
+                return True
+            return False
+
+        # ready_stat = SubscriptionStatus(self.ready, trigger_falling, timeout = self.bpm_timeout, run = False)
+        stat_pkd   = SubscriptionStatus(self.packed_data, cb, timeout = self.bpm_timeout * 2, run = False)
+        # status = AndStatus(ready_stat, stat_pkd)
+        return stat_pkd
 
         #status = self.measurement_state.watch_and_take_data(timeout = self.bpm_timeout,
         #                                                        validation_time = self.validation_time)

@@ -231,6 +231,7 @@ class BPMWaveform(  bpm_raw.BPMPackedData ):
             self.checkAndStorePackedData(data)
             status_processed.success = True
             status_processed.done = True
+            status_processed._finished()
 
 
         status = super().trigger()
