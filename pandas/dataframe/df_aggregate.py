@@ -11,7 +11,7 @@ import logging
 logger = logging.getLogger('bact2')
 
 
-def time_vector_mean(vec):
+def time_vector_mean(vec, df=None):
     '''Calculate the average time for a sequence of datetime values
 
 
@@ -33,7 +33,7 @@ def time_vector_mean(vec):
     return ref + dt.mean()
 
 
-def time_series_mean(t_series):
+def time_series_mean(t_series, df=None):
     '''Calculate the mean value of a time series
 
     Used as possible callback for :func:`df_with_vectors_aggregate`
@@ -41,15 +41,25 @@ def time_series_mean(t_series):
     return time_vector_mean(t_series.values)
 
 
-def vectors_mean(t_vecs):
+def vectors_mean(t_vecs, df=None):
     '''Calculate the mean value for each vector
 
     Used as possible callback for :func:`df_with_vectors_aggregate`
     '''
     return np.mean(t_vecs, axis=0)
 
+def vectors_mean_skip_first(t_vecs, df=None):
+    assert(df is not None)
 
-def vector_strings_same_value(t_vecs):
+    t_time = df.time
+    idx = t_time.argsort().min()
+    if idx != 0:
+        raise AssertionError('first measurement was not the first entry')
+    reduced = t_vecs[1:]
+    return np.mean(reduced, axis=0)
+
+
+def vector_strings_same_value(t_vecs, df=None):
     '''return the first vector if all following vectors are identical
 
     Used for processing strings by :func:`df_with_vectors_aggregate`
@@ -86,10 +96,11 @@ def vector_aggregate_check_keywords(**kws):
 
 
 def _vector_aggregate(t_data, func_for_vecs=None, func_for_time=None,
-                      error_msg_f=None, column_name=None, l_index=None):
+                      error_msg_f=None, column_name=None, l_index=None,
+                      df=None):
 
     try:
-        return func_for_vecs(t_data.values)
+        return func_for_vecs(t_data.values, df=df)
     except Exception:
         logger.debug(error_msg_f() + '; first try')
 
@@ -100,7 +111,7 @@ def _vector_aggregate(t_data, func_for_vecs=None, func_for_time=None,
                ' of type datetime64')
         logger.debug(fmt.format(column_name))
         if func_for_time:
-            return func_for_time(t_data)
+            return func_for_time(t_data, df=df)
         else:
             return None
 
@@ -121,7 +132,7 @@ def _vector_aggregate(t_data, func_for_vecs=None, func_for_time=None,
         if dtype is not None and np.issubsctype(dtype, str):
             fmt = "found strings in column {} processing as strings!"
             logger.debug(fmt.format(column_name))
-            return vector_strings_same_value(values)
+            return vector_strings_same_value(values, df=df)
 
     fmt = 'Column {} len (values) = {} len (index) = {} '
     logger.debug(fmt.format(column_name, lv, l_index))
@@ -189,6 +200,7 @@ def df_with_vectors_aggregate(df, group, grouped_df, func_for_vecs,
     # Special treatment for vector like frames
     for target_index, index in group.groups.items():
         for col in missing_cols:
+            df_sel = df.loc[index, :]
             t_data = df.loc[index, col]
 
             def errmsg():
@@ -209,7 +221,7 @@ def df_with_vectors_aggregate(df, group, grouped_df, func_for_vecs,
             kws['error_msg_f'] = errmsg
             l_index = len(index)
             elem = _vector_aggregate(t_data, column_name=col, l_index=l_index,
-                                     **kws)
+                                     df=df_sel, **kws)
             if elem is not None:
                 # Using index in the first column did not work for me
                 ndf.loc[:, col].at[target_index] = elem
@@ -227,3 +239,56 @@ def df_with_vectors_mean(df, column_name):
 
     return df_with_vectors_aggregate(df, grp, tdf, vectors_mean,
                                      func_for_time=time_series_mean)
+
+
+def df_with_vectors_mean_skip_first(df, column_name='measurement'):
+    '''Calculate the mean by skipping the first measurement
+    '''
+    grp = df.groupby(by=column_name)
+    tdf = grp.mean()
+
+    return df_with_vectors_aggregate(df, grp, tdf, vectors_mean_skip_first)
+
+def df_vectors_convert(df, copy = True):
+    '''Convert objects to vectors if possible
+
+    JSON export e.g. exports objects as lists. These require to be
+    converted back for further processing.
+
+    Best practise: call :meth:`df.infer_objects` first
+
+    Todo:
+        Check if array strings require further processing
+    '''
+    if copy:
+        df = df.copy()
+
+    rows = range(df.shape[0])
+    for col in df.columns:
+        t_col = df.loc[:, col]
+        dtype = t_col.dtype
+        if dtype != np.object_:
+            continue
+
+        # try to convert the first object in the column
+        obj = t_col.iat[0]
+        test = np.array(obj)
+        test_d = test.dtype
+
+        fmt = 'column {} test dtype {} object dtype {}'
+        txt = fmt.format(col, dtype, test_d)
+        logger.debug(txt)
+
+        if test_d not in [np.float64, np.int64]:
+            continue
+
+        # Array type known, lets convert it
+        as_list = t_col.values.tolist()
+
+        # nd = pd.Series(index=df.index, data=as_list, dtype=np.object_)
+        # df.loc[:, col] = nd
+        converted_array = np.array(as_list, test_d)
+        for row in rows:
+            df.loc[:, col].iat[row] = converted_array[row]
+
+    return df
