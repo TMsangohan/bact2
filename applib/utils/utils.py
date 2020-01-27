@@ -42,8 +42,9 @@ def add_measurement_count(df, grp, counter,
             current = steerer_meas_t.I_rounded[idx]
             df.loc[idx, count_column] = counter(current)
 
+
 def add_measurement_counts_old(df, steerer_column='sc_selected',
-                           mode_column='bk_dev_mode', copy=True):
+                               mode_column='bk_dev_mode', copy=True):
     '''
 
     Separate measurement
@@ -83,6 +84,7 @@ def add_measurement_index(df):
         df.loc[indices, 'ramp_index'] = n_measurement
     return df
 
+
 def count_measurements(df, columns):
     all_flags = None
     for col in columns:
@@ -94,15 +96,16 @@ def count_measurements(df, columns):
             all_flags = all_flags | flags
     return flags
 
-def add_measurement_counts(df, columns=['sc_selected', 'bk_dev_mode', 'I_rounded'],
-                           count_column = 'measurement',
-                           copy=True):
-    
+
+def add_measurement_counts(df,
+                           columns=['sc_selected', 'bk_dev_mode', 'I_rounded'],
+                           count_column='measurement', copy=True):
+
     if copy:
         df = df.copy()
 
     all_flags = count_measurements(df, columns)
-    #return all_flags
+    # return all_flags
     measurement_index = all_flags.cumsum()
     df.loc[:, count_column].values[0] = 0
     df.loc[:, count_column].values[1:] = measurement_index

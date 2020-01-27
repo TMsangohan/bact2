@@ -79,6 +79,7 @@ class SteererSort(SteererInfo):
                          self.name, self.payload, self.count)
         return txt
 
+
 def provide_steerer_sort(df, steerer_name='sc_selected'):
 
     sel = df.loc[:, steerer_name]
@@ -88,7 +89,6 @@ def provide_steerer_sort(df, steerer_name='sc_selected'):
     for t in tmp:
         t.count = counter(t.name)
     return tmp
-
 
 
 def compute_relative_step(df, ref_current):
@@ -107,15 +107,16 @@ def add_relative_steps(df, horizontal_current, vertical_current, copy=True):
         df.steerer_type == 'horizontal',
         df.steerer_type == 'vertical'
     )
-    start_currents =(
+    start_currents = (
         horizontal_current,
         vertical_current
     )
     for index, start_current in zip(indices, start_currents):
-        sel  = df.loc[index, :]
-        relative_step = compute_relative_step(sel,start_current)
+        sel = df.loc[index, :]
+        relative_step = compute_relative_step(sel, start_current)
         df.loc[index, 'relative_step'] = relative_step
     return df
+
 
 def add_steerer_info(df, copy = True):
     '''
@@ -130,7 +131,8 @@ def add_steerer_info(df, copy = True):
 
     # Check that acceptable steerernames are found
     steerer_type_flagged = (steerer_type == 'h') | (steerer_type == 'v')
-    assert((steerer_type_flagged == True).all())
+    flags = (steerer_type_flagged == True)
+    assert(flags.all())
 
     # I prefer names that are better to read
     steerer_type = np.where(steerer_type == 'h', 'horizontal', 'vertical')
