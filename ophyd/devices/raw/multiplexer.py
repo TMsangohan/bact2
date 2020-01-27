@@ -9,7 +9,7 @@ from ophyd import Device, Signal, EpicsSignal, EpicsSignalRO, PVPositionerPC, Co
 from ophyd.status import Status, AndStatus, DeviceStatus
 from ophyd.areadetector.base import ad_group
 from ophyd.device import  DynamicDeviceComponent as DDC
-from ..utils import measurement_state_machine, signal_with_validation
+from ..utils import signal_with_validation
 from .quad_list import quadrupoles
 
 #: Construct a list of quadrupoles multiplexer
