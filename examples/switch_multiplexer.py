@@ -14,8 +14,7 @@ from ophyd import sim
 from cycler import cycler
 
 import bact2
-import bact2.bluesky.hacks.callbacks
-from bact2.bluesky.hacks.callbacks import LivePlot, AxisWrapper
+from bluesky.callbacks import LivePlot, LiveTable #, AxisWrapper
 
 from bact2.ophyd.devices.raw import multiplexer, quad_list
 from bact2.ophyd.utils.preprocessors.CounterSink import CounterSink
@@ -27,14 +26,14 @@ class SelectorPlot(LivePlot):
         """Just show the change
         """
         # Scale the current
-        dev = y - x
-        return super().update_caches(x, dev)
+        diff = y - x
+        return super().update_caches(x, diff)
 
 
 
 def main():
 
-    n_meas = 5
+    n_meas = 1
     cs = CounterSink(name = "count_bpm_reads", delay = .2)
     repeat = cycler(cs, range(n_meas))
 
@@ -50,42 +49,47 @@ def main():
     loop_over_quads = cycler(mux.selector, quad_list.quadrupoles)
     # loop_over_quads = loop_over_quads[:5]
 
-    print(mux)
-    det = [mux.selector.selected, mux.selector.readback]
+    det = [mux.selector, mux.power_converter]
     for d in det:
         print (d.name)
 
     bec = bc.best_effort.BestEffortCallback()
 
     RE = RunEngine({})
-    #RE.log.setLevel("DEBUG")
-    RE.log.setLevel("INFO")
+    # RE.log.setLevel("DEBUG")
+    # RE.log.setLevel("INFO")
     #print(dir(bpm))
     mux.selector.mux_switch_validate.setLogger(RE.log)
     mux.selector.setLogger(RE.log)
 
-    RE.subscribe(bec)
+    # Seems not to work ....
+    # RE.subscribe(bec)
     install_qt_kicker()
-    RE.waiting_hook = ProgressBarManager()
+    # RE.waiting_hook = ProgressBarManager()
 
     # serializer = Serializer('localhost',9200)
     # RE.subscribe(serializer)
 
-    f = plt.figure(1, [20, 6])
-    ax1 = plt.subplot(131)
-    ax2 = plt.subplot(132)
-    ax3 = plt.subplot(133)
+    # f = plt.figure(1, [20, 6])
+    # ax1 = plt.subplot(131)
+    # ax2 = plt.subplot(132)
+    # ax3 = plt.subplot(133)
 
-    ax1 = AxisWrapper(ax1)
-    ax2 = AxisWrapper(ax2)
-    ax3 = AxisWrapper(ax3)
+    # ax1 = AxisWrapper(ax1)
+    # ax2 = AxisWrapper(ax2)
+    # ax3 = AxisWrapper(ax3)
 
-    RE(bp.scan_nd(det, loop_over_quads * repeat),
-       [SelectorPlot("mux_selector_selected_num", "mux_selector_setpoint_num",  ax = ax1, marker = '.'),
-        LivePlot("mux_selector_set_time", "mux_selector_setpoint_num",   ax = ax2, marker = '.'),
-       LivePlot("mux_selector_last_wait", "mux_selector_setpoint_num",   ax = ax3, marker = '.')]
-
-    )
+    lt = LiveTable(
+        [mux.selector.selected_num, mux.selector.readback,
+         mux.power_converter.setpoint, mux.power_converter.readback
+        ], default_prec=10)
+    callbacks = [
+        #SelectorPlot("mux_selector_selected_num", "mux_selector_setpoint_num",  ax = ax1, marker = '.'),
+        #LivePlot("mux_selector_set_time", "mux_selector_setpoint_num",   ax = ax2, marker = '.'),
+        #LivePlot("mux_selector_last_wait", "mux_selector_setpoint_num",   ax = ax3, marker = '.'),
+        lt
+    ]
+    RE(bp.scan_nd(det, loop_over_quads * repeat), callbacks)
 
 
 

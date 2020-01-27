@@ -49,9 +49,10 @@ class FlickerSignal:
         # Time to wait that new data arrives
         self.validation_time = validation_time #s
         self.loop = asyncio.get_event_loop()
-        self.__logger = logger
         # Used to find if data was resent
         self._n_triggered = 0
+
+        # Set the info on timing
         self.tic()
         self.tac()
 
@@ -70,7 +71,7 @@ class FlickerSignal:
         return self._store_dt
 
     def setLogger(self, logger):
-        self.__logger = logger
+        self.log = logger
 
     @property
     def timeout(self):
@@ -101,11 +102,11 @@ class FlickerSignal:
         assert(device_status is not None)
         now_count =  self._n_triggered
         fmt = "New data arrived?  counts: expected {} found {} "
-        self.__logger.info(fmt.format(expected_count, now_count))
+        self.log.info(fmt.format(expected_count, now_count))
         if now_count == expected_count:
-            log_debug("No new data arrived: done cnt {} unscribing!".format(now_count))
+            self.log.debug("No new data arrived: done cnt {} unscribing!".format(now_count))
             assert(self.signal is not None)
-            log_debug("No new data arrived: marking device_status {} id({}) as done !".format(device_status, id(device_status)))
+            self.log.debug("No new data arrived: marking device_status {} id({}) as done !".format(device_status, id(device_status)))
             # print("Unwrapped callbacks {} wrapped callbacks {}".format(
             #    self.signal._unwrapped_callbacks,
             #    self.signal._callbacks
@@ -120,7 +121,7 @@ class FlickerSignal:
         else:
             self.tac()
             fmt = "New data arrived after {}: Expecting other trigger to mark status as done"
-            log_debug(fmt.format(self.stored_dt()))
+            self.log.debug(fmt.format(self.stored_dt()))
 
     def delay_signal_status(self, *args, book_keeping = None, **kwargs):
         """
@@ -128,8 +129,7 @@ class FlickerSignal:
         def log_debug(txt):
             tref = time.time() - self._t0
             txt = "tref {:.2f} ".format(tref) + txt
-            if self.__logger:
-                self.__logger.info(txt)
+            self.log.debug(txt)
 
 
         assert(book_keeping is not None)
@@ -173,6 +173,7 @@ class FlickerSignal:
                 self.parent = parent
                 self.device_status = device_status
                 self.cid = None
+
             def __call__(self, *args, **kwargs):
                 self.parent.delay_signal_status(*args, book_keeping = self, **kwargs)
 
@@ -186,7 +187,7 @@ class FlickerSignal:
             nonlocal cb
             self.signal.clear_sub(cb)
 
-        device_status.add_callback(unsubscirbe)
+        device_status.add_callback(unsubscribe)
         self.signal.subscribe(cb,  run = run)
 
         # print("Subscribers {}".format(self.signal._unwrapped_callbacks))
@@ -198,8 +199,8 @@ class FlickerSignal:
             kws["timeout"] = self._timeout
 
         assert(self.signal is not None)
-        device_status = DeviceStatus(device=self.signal, timeout = self.timeout)
-        self.execute_validation(device_status, run = False)
+        device_status = DeviceStatus(device=self.signal, timeout=self.timeout)
+        self.execute_validation(device_status, run=False)
         return device_status
 
     def data_read(self):
