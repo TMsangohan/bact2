@@ -9,7 +9,7 @@ from ophyd import Device, Signal, EpicsSignal, EpicsSignalRO, PVPositionerPC, Co
 from ophyd.status import Status, AndStatus, DeviceStatus
 from ophyd.areadetector.base import ad_group
 from ophyd.device import  DynamicDeviceComponent as DDC
-from ..utils import signal_with_validation
+from ..utils import signal_with_validation, ReachedSetPoint
 from .quad_list import quadrupoles
 
 #: Construct a list of quadrupoles multiplexer
@@ -19,7 +19,7 @@ import logging
 logger = logging.getLogger()
 
 import time
-
+import numpy as np
 
 class TEpicsSignal( EpicsSignal ):
     """
@@ -41,25 +41,48 @@ class EpicsSignalStr( EpicsSignalRO ):
         print("{} read to {}".format(self.name, r))
         return r
 
-class MultiplexerPowerConverter( PVPositionerPC ):
-    """Access to the multiplexer value
+t_super = PVPositionerPC
+t_super = ReachedSetPoint.ReachedSetpoint
+
+class MultiplexerPowerConverter(t_super):
+    """Multiplexer as a power converter
+
+    Todo:
+        Derive from a setpoint which allows checking:
+
+            * eps_abs: can be quite small
+            * eps_rel: seems that the setpoint and the readback are
+                       quite different at 2 A
+
+       Furthermore consider checking the slew rate at the end of the
+       ramp. If the values do not change at the end, it can be expected
+       that no furher change will occur.
     """
     readback = Cpt(EpicsSignal,   'QSPAZR:rdbk')
     setpoint = Cpt(EpicsSignal,   'QSPAZR:set')
     switch   = Cpt(EpicsSignal,   'QSPAZR:cmd1')
     status   = Cpt(EpicsSignalRO, 'QSPAZR:stat1')
     no_error = Cpt(EpicsSignalRO, 'QSPAZR:stat2')
+    tolerable_zero_current = Cpt(Signal, name='tolerable_error', value=20e-3)
 
     def __init__(self, *args, **kwargs):
+        # kwargs.setdefault('settle_time', 2)
         super().__init__(*args, **kwargs)
 
     def setLogger(self, logger):
         self.log = logger
 
     def set(self, value):
-        fmt = "Setting power mux power converter to value {}"
-        self.log.info(fmt.format(value))
-        stat = NullStatus()
+        txt = f"Setting power mux power converter to value {value}"
+        self.log.info(txt)
+
+
+        stat = super().set(value)
+
+        return stat
+
+        stat = Status(success=True, done=True)
+        stat._finished()
         return stat
 
     def setToZero(self):
@@ -67,11 +90,18 @@ class MultiplexerPowerConverter( PVPositionerPC ):
         '''
         self.setpoint.value = 0
 
-    def stop(self):
+    def isOff(self):
+        value = self.readback.value
+        aval = np.absolute(value)
+        flag = aval < self.tolerable_zero_current.value
+        return flag
+
+    def stop(self, success=False):
         self.setToZero()
 
     def unstage(self):
         self.setToZero()
+        super().unstage()
 
 class MultiplexerPCWrapper( Device ):
     """Create the list of power converter set PV"s
@@ -362,6 +392,16 @@ class MultiplexerSelector( PVPositionerPC ):
            Check that the value ios correct at the end
         """
 
+
+        # Short check that
+        pc = self.parent.power_converter
+        flag = pc.isOff()
+        if not flag:
+            self.log.error('Requesting swtich off while power converter is running!')
+            self.log.error(f'setpoint {pc.setpoint.value} readback {pc.readback.value}'
+                           f'tolerable zero current {pc.tolerable_zero_current.value}')
+            assert(flag)
+
         self._timestamp = time.time()
         num = quadrupoles.index(value)
         self.setpoint_num.set(num)
@@ -401,6 +441,7 @@ class MultiplexerSelector( PVPositionerPC ):
 
         Just for symmetry
         """
+        return super().stage()
 
     def unstage(self):
         """
@@ -409,6 +450,7 @@ class MultiplexerSelector( PVPositionerPC ):
            To be sure that its left over as off
         """
         self.switchOff()
+        return super().unstage()
 
     def stop(self, success=False):
         self.switchOff()
@@ -427,7 +469,9 @@ class Multiplexer( Device ):
     selector = Cpt(MultiplexerSelector, name = 'selector',
                     settle_time = 0.5, timeout = 10.0)
 
-    power_converter = Cpt(MultiplexerPowerConverter, name = "mux_pc", egu = "A")
+    power_converter = Cpt(MultiplexerPowerConverter, name="mux_pc", egu="A",
+                          setting_parameters=.05 * 2, settle_time=2,
+                          timeout=20)
     activate = Cpt(MultiplexerPCWrapper, name = 'activate')
 
     def __init__(self, *args, **kwargs):
@@ -437,7 +481,8 @@ class Multiplexer( Device ):
 
     def unstage(self):
         self.power_converter.unstage()
-        # self.selector.unstage()
+        self.selector.unstage()
+        return super().unstage()
 
     def stop(self, success=False):
         self.power_converter.stop(success=success)

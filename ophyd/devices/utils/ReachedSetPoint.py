@@ -45,6 +45,7 @@ class DoneBasedOnReadback(t_super):
         Code not yet checked
 
     """
+
     def __init__(self, *args, **kws):
         """
 
@@ -73,7 +74,6 @@ class DoneBasedOnReadback(t_super):
 
         # Required to trace the status of the device
         self._moving = None
-        self.__logger = logger
 
 
     def _checkSetup(self):
@@ -111,11 +111,11 @@ class DoneBasedOnReadback(t_super):
         raise OphydMethodNotOverloaded("Overload this method")
 
     def setLogger(self, logger):
-        self.__logger = logger
+        self.log = logger
 
     @property
     def logger(self):
-        return self.__logger
+        return self.log
 
     def set(self, value):
         """
@@ -132,7 +132,7 @@ class DoneBasedOnReadback(t_super):
             txt = "%s:set cb: args %s  kws %s: self._moving %s pos_valid %s" % tup
             #print(txt)
 
-            logger = self.__logger
+            logger = self.log
             if logger is not None:
                 logger.debug(txt)
 
@@ -158,7 +158,10 @@ class DoneBasedOnReadback(t_super):
             return status
 
 
-        status = SubscriptionStatus(self.readback, callback, timeout=self._timeout)
+        self.log.info(f'settle time {self.settle_time}')
+        status = SubscriptionStatus(self.readback, callback,
+                                    timeout=self._timeout,
+                                    settle_time=self.settle_time)
         self.setpoint.set(value)
 
         tup = self.__class__.__name__, value, status
@@ -197,11 +200,13 @@ class ReachedSetpoint(DoneBasedOnReadback):
 
 
         diff = abs(rbk - setp)
-
         flag = diff < limit
 
-        tup = self.__class__.__name__, setp, rbk, diff, limit, flag
-        txt = "%s:_positionReached: set %s rbk %s diff %s limit %s position valid %s" % tup
+        c_name = self.__class__.__name__
+        setp, rbk, diff, limit, flag
+        txt = (
+            f'{c_name}:_positionReached: set {setp} rbk {rbk} diff {diff} limit {limit} position valid {flag}'
+        )
         # print(txt)
 
         logger = self.logger
