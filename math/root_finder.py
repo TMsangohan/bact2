@@ -25,7 +25,7 @@ class LinearGradient:
         f = np.asarray(self.f_vals)
         return f
 
-    def fdfFromInterpolation(self, x):   
+    def fdfFromInterpolation(self, x):
         xv = self.x
         fv = self.f
         print(f'Last data x={xv} f={fv}')
@@ -86,8 +86,8 @@ def compute_test_point(xv, fv, x, f, df, max_scale=10):
 
     Computes a test point which is in direction of x,
     but its not further off than max_scale from the already
-    known data. It assumes that the data xv and fv are 
-    basically representing a straight line.    
+    known data. It assumes that the data xv and fv are
+    basically representing a straight line.
 
     Args:
         xv: x vector containing previously collected data
@@ -107,20 +107,20 @@ def compute_test_point(xv, fv, x, f, df, max_scale=10):
             1. First the extrema are selected from xv and fv
             2. The distance between these points is used to represent
                the current scale
-        2. Estimate how far off `x` and `f` are 
-            1. The extrema are again calculated adding `x` and `f` to the 
+        2. Estimate how far off `x` and `f` are
+            1. The extrema are again calculated adding `x` and `f` to the
                repective vectors
             2. Again the distance of these extrema is calculated
         3. the ratio of theses distances are used to calculate the scale
         4. If the scale is below max_scale the result is returned with
            the point identical to `x`.
-        5. If the scale is out of range a point `x_estimate` is calculated 
+        5. If the scale is out of range a point `x_estimate` is calculated
            using `max_scale`
     '''
     xtest = np.append(xv, x)
     ftest = np.append(fv, f)
 
-    # compute overall distance of tracked points    
+    # compute overall distance of tracked points
     dl      = length_of_points(xv,    fv)
     dl_test = length_of_points(xtest, fv)
 
@@ -129,7 +129,7 @@ def compute_test_point(xv, fv, x, f, df, max_scale=10):
     print(f'xv {xv} x {x} dl {dl} dl_test {dl_test} scale {scale} max scale {max_scale}')
     if scale <= max_scale:
         # Not a decade off .. lets go ahead
-        # That's the signal to the caller that no change 
+        # That's the signal to the caller that no change
         # Was required
         r = TestPointResult(x, scale, False)
         return r
@@ -154,7 +154,7 @@ def compute_test_point(xv, fv, x, f, df, max_scale=10):
 
     idx = adiff.argmin()
     x_start = xv[idx]
-    # This is the distance from the nearest point in 
+    # This is the distance from the nearest point in
     x_test = x_start + dx_accepted
     r = TestPointResult(x_test, scale, True)
     return r
@@ -187,7 +187,7 @@ class CautiousRootFinder(RootFinder):
 
     def evalf(self, x):
         xv = self.func.x
-        fv = self.func.x
+        fv = self.func.f
 
         if len(xv)<2:
             return self.func(x)
@@ -198,12 +198,12 @@ class CautiousRootFinder(RootFinder):
         # How far are we off from the interpolation range ...
         r = compute_test_point(xv, fv, x, f_forecast, df_forecast)
         if not r.estimated:
-            # point x can be used ... 
+            # point x can be used ...
             return self.func(r.result)
 
         f_test = self.func(r.result)
 
-        # Extrapolate to the correct point 
+        # Extrapolate to the correct point
         dx = x - r.result
         f_extrapolated = f_test + df_forecast * dx
 

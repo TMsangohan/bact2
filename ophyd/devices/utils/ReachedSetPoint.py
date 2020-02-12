@@ -1,6 +1,8 @@
-from ophyd import PVPositionerPC
+from ....math.utils import compare_value
+
+from ophyd import PVPositionerPC, Component as Cpt, Signal
 from ophyd.utils import errors
-from ophyd.status import SubscriptionStatus, Status
+from ophyd.status import SubscriptionStatus, Status, AndStatus
 import logging
 
 logger = logging.getLogger()
@@ -44,6 +46,8 @@ class DoneBasedOnReadback(t_super):
     Warning:
         Code not yet checked
 
+    Todo:
+        Check __init__ handling timeout
     """
 
     def __init__(self, *args, **kws):
@@ -55,6 +59,7 @@ class DoneBasedOnReadback(t_super):
         self._setting_parameters = None
         self._timeout = None
         setting_parameters = kws.pop("setting_parameters", None)
+
         timeout = kws.pop("timeout", 0.0)
         timeout = float(timeout)
 
@@ -110,12 +115,6 @@ class DoneBasedOnReadback(t_super):
         """
         raise OphydMethodNotOverloaded("Overload this method")
 
-    def setLogger(self, logger):
-        self.log = logger
-
-    @property
-    def logger(self):
-        return self.log
 
     def set(self, value):
         """
@@ -132,10 +131,7 @@ class DoneBasedOnReadback(t_super):
             txt = "%s:set cb: args %s  kws %s: self._moving %s pos_valid %s" % tup
             #print(txt)
 
-            logger = self.log
-            if logger is not None:
-                logger.debug(txt)
-
+            self.log.debug(txt)
             if self._moving and pos_valid:
                 self._moving = False
                 return True
@@ -145,7 +141,6 @@ class DoneBasedOnReadback(t_super):
 
         pos_valid = self._positionReached(check_set_value = value)
 
-        logger = self.logger
 
         if pos_valid:
             status = Status()
@@ -153,17 +148,17 @@ class DoneBasedOnReadback(t_super):
             status.success = 1
             tup = self.__class__.__name__, value,
             txt = "%s: no motion required for value %s" % tup
-            if logger:
-                logger.info(txt)
+            self.log.info(txt)
             return status
 
 
         self.log.info(f'settle time {self.settle_time}')
-        status = SubscriptionStatus(self.readback, callback,
+        stat_rbk = SubscriptionStatus(self.readback, callback,
                                     timeout=self._timeout,
                                     settle_time=self.settle_time)
-        self.setpoint.set(value)
+        stat_setp = self.setpoint.set(value, timeout=self._timeout)
 
+        status = AndStatus(stat_rbk, stat_setp)
         tup = self.__class__.__name__, value, status
         txt = "%s:set cb: value %s status = %s" % tup
         #print(txt)
@@ -228,3 +223,61 @@ class ReachedSetpoint(DoneBasedOnReadback):
             raise OphydInvalidParameter(msg %(setting_parameters, des.mesg))
 
         return t_range
+
+class ReachedSetpointEPS(DoneBasedOnReadback):
+    """Setpoint within some absolute and relative precision
+    """
+    eps_rel = Cpt(Signal, name='eps_rel', value=1e-9)
+    eps_abs = Cpt(Signal, name='eps_abs', value=1e-9)
+
+    def _correctReadback(self, val):
+        return val
+
+    def _positionReached(self, *args, **kws):
+        """position within given range?
+        """
+        rbk = self.readback.value
+        rbk = self._correctReadback(rbk)
+
+        check_set_value = kws.pop("check_set_value", None)
+        if check_set_value is None:
+            setp = self.setpoint.value
+        else:
+            setp = check_set_value
+
+        eps_abs = self.eps_abs.value
+        eps_rel = self.eps_rel.value
+
+        t_cmp = compare_value(rbk, setp, eps_abs=eps_abs, eps_rel=eps_rel)
+        flag = t_cmp == 0
+        c_name = str(self.__class__)
+        txt = (
+            f'{c_name}:_positionReached: set {setp} rbk {rbk} eps: abs {eps_abs} rel {eps_rel} comparison {t_cmp} position valid {flag}'
+        )
+        # print(txt)
+
+        self.log.info(txt)
+        return flag
+
+    def _checkSettingParameters(self, unused):
+        """Absolute value for setting parameter
+
+        And thus just a float
+        """
+        eps_abs = self.eps_abs.value
+        try:
+            t_range = float(eps_abs)
+            assert(t_range >0)
+        except ValueError as des:
+            msg = f"Expected eps_abs {eps_abs}  >0 got: error {des}"
+            raise OphydInvalidParameter(msg)
+
+        eps_rel = self.eps_rel.value
+        try:
+            t_range = float(eps_rel)
+            assert(t_range >0)
+        except ValueError as des:
+            msg = f"Expected eps_rel {eps_rel}  >0 got: error {des}"
+            raise OphydInvalidParameter(msg)
+
+        return True

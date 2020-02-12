@@ -7,8 +7,8 @@ Todo:
 
 
 '''
-from ophyd import Signal, Device, Component as Cpt
-from ophyd.ophydobj import Kind
+from ophyd import Signal, Device, Component as Cpt, Kind
+#from ophyd.ophydobj import Kind
 from ophyd.areadetector.base import ad_group
 from ophyd.device import  DynamicDeviceComponent as DDC
 from ophyd.status import AndStatus
@@ -110,11 +110,42 @@ class SignalProxy( Signal ):
 class Steerer( PowerConverter ):
     """Steerer with certain settings
     """
+    #: reference value to store
+    rv = Cpt(Signal, name='ref_val', value=np.nan)
+    #: shall the compomnent be set back
+    set_back = Cpt(Signal, name='set_bak', value=False, kind=Kind.config)
+    eps_rel = Cpt(Signal, name='eps_rel', value=2e-3)
+    eps_abs = Cpt(Signal, name='eps_abs', value=2e-4)
+
     def __init__(self, *args, **kwargs):
-        # could be 10 ms enough?
-        kwargs.setdefault('settle_time', 0.1)
+        # 10 ms is way too short
+        # let's go for rather half a second
+        kwargs.setdefault('settle_time', .5)
+        kwargs.setdefault('timeout', 20)
         super().__init__(*args, **kwargs)
 
+
+    def setToStoredValue(self):
+        if self.set_back.value:
+            self.setpoint.value = self.rv.value
+
+    def stage(self):
+        '''
+        '''
+        self.rv.value = self.setpoint.value
+        return super().stage()
+
+    def unstage(self):
+        '''
+
+        Warning:
+            If the call to super is not here the code will stop
+            working
+        '''
+        return super().unstage()
+
+    def stop(self, success=False):
+        self.setToStoredValue()
 
 class _SelectedSteerer( Device ):
     setpoint = Cpt(SignalProxy, name='set',  value = np.nan, kind = 'hinted', lazy = False)
@@ -163,6 +194,16 @@ class _SelectedSteerer( Device ):
         self.log.debug(txt)
         return r
 
+    def set(self, value):
+        sel = self._selected_steerer
+        assert(sel is not None)
+        return sel.set(value)
+
+    def stop(self, success=False):
+        sel = self._selected_steerer
+        if sel is not None:
+            sel.stop(success=success)
+
     def __del__(self):
         self.unsubscribeSelected()
 
@@ -171,11 +212,15 @@ class SelectedSteerer( Device ):
     """
     dev = Cpt(_SelectedSteerer, '', #egu='A',
               #setting_parameters = 0.1,
-              #timeout = 2
-                  )
+              # timeout = 2
+    )
 
     def trigger(self):
         return self.dev.trigger()
+
+    def stop(self, success=False):
+        self.dev.stop(success=success)
+
 
 
 class SteererCollection( Device ):
@@ -237,3 +282,7 @@ class SteererCollection( Device ):
         fmt = "{}.trigger: {} "
         self.log.debug(fmt.format(self.name, status))
         return status
+
+
+    def stop(self, success=False):
+        self.sel.stop(success=success)

@@ -8,17 +8,14 @@ from bluesky.utils import separate_devices, Msg
 import numpy as np
 import logging
 logger = logging.getLogger('bact2')
-
+logger.setLevel(logging.INFO)
 import copy
 
 # Currents cycle ... respect hysteresis
 current_signs = np.array([0, 1, -1, 0])
 
 
-
-
-from bact2.bluesky.live_plot.line_index import Offset
-
+from ..live_plot.line_index import Offset
 class OrbitTrace:
     def __init__(self):
         self._x_orbit = Offset()
@@ -67,7 +64,7 @@ def calculate_orbit_offset(val, bpm_prefix = 'bpm_waveform'):
     # print(txt)
     return dr
 
-def steerer_current_offset(steerer):
+def steerer_current_offset(steerer, logger=None):
     # Using setpoint as reference ... assuming that this is the more
     # accurate value
     # make sure data are here
@@ -78,7 +75,7 @@ def steerer_current_offset(steerer):
 
 
 def step_steerer(steerer, currents, detectors, num_readings, current_offset = None,
-                 book_keeping_dev = None):
+                 book_keeping_dev = None, logger=None):
     """
 
     Todo:
@@ -90,12 +87,13 @@ def step_steerer(steerer, currents, detectors, num_readings, current_offset = No
     # accurate value
     # make sure data are here
     if current_offset is None:
-        current_offset = (yield from steerer_current_offset(steerer))
+        current_offset = (yield from steerer_current_offset(steerer, logger=logger))
 
 
     logger.info('Using steerer offset {:.5f}'.format(current_offset))
 
     for d_current in currents:
+        yield from bps.checkpoint()
         if d_current == 0:
             #print('Current step 0')
             pass
@@ -112,6 +110,7 @@ def step_steerer(steerer, currents, detectors, num_readings, current_offset = No
 
         det = [steerer] + detectors
         for i in range(num_readings):
+            yield from bps.checkpoint()
             val = (yield from bps.trigger_and_read(det))
             # First bpm reading has to be ignored .....
             if i  > 0:
@@ -121,10 +120,11 @@ def step_steerer(steerer, currents, detectors, num_readings, current_offset = No
 
 
 
+
+
 def steerer_search_step(steerer, start_current, detectors, num_readings, bpm_prefix = 'bpm_waveform', dr_target = 1.0,
                         dr_scale_max = 25, dr_eps = 1e-2, eps_rel=.1, eps_clip = 1e-4,
-                        current_offset  = None,
-                        book_keeping_dev = None):
+                        current_offset  = None, book_keeping_dev = None, linear_gradient=None, root_finder=None,logger=None):
     """
 
     Todo:
@@ -132,10 +132,91 @@ def steerer_search_step(steerer, start_current, detectors, num_readings, bpm_pre
     """
 
 
-
     det = [steerer] + detectors
 
-    d_current = 0
+    st_name = steerer.name
+
+
+    ref_value = steerer.setpoint.value
+    root_finder.x0.value = start_current + ref_value
+
+    root_finder.reset()
+    root_finder.init()
+
+    logger.info('Starting thread')
+
+    limits = steerer.setpoint.limits
+    limits = np.array(limits)
+    assert((np.absolute(limits)>1e-8).all())
+    dl = limits[1] - limits[0]
+    assert(dl>1e-8)
+
+    dr_max = None
+    for t_current in root_finder:
+        txt = f'setting steerer {st_name} to current {t_current}'
+        logger.info(txt)
+
+        if t_current is None:
+            # Signal ... that's all folks
+            break
+        if t_current > limits.max():
+            raise AssertionError
+        elif t_current < limits.min():
+            raise AssertionError
+
+
+        d_current = t_current - ref_value
+        book_keeping_dev.dI.value = float(d_current)
+
+        yield from bps.mv(steerer, t_current)
+
+        for i in range(num_readings):
+            val = ( yield from bps.trigger_and_read(det) )
+
+        dr = calculate_orbit_offset(val)
+        dr_max = dr.max()
+
+        # That's the value to minimise
+        diff = dr_target - dr_max
+        logger.info(f'setting steerer {st_name} to current {t_current} gave dr {dr_max} diff {diff}')
+
+        root_finder.push(diff)
+
+    the_root = root_finder.result
+    logger.info(f'Root result {the_root}')
+
+    r = the_root.root
+    d_current = r - ref_value
+    book_keeping_dev.dI.value = float(d_current)
+
+    total_scale = d_current/start_current
+
+
+    logger.info(f'Steerer {st_name} found current {the_root} total scale {total_scale}')
+
+    book_keeping_dev.scale_factor.value = total_scale
+
+    return the_root, total_scale
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+    d_current = r
 
     d_current = start_current
     last_scale = 1
@@ -240,7 +321,10 @@ def steerer_search_step(steerer, start_current, detectors, num_readings, bpm_pre
 
     return d_current, total_scale
 
-def select_step_steerer(col, name, currents, *args, dr_target = 1.0,  book_keeping_dev = None, **kws):
+def select_step_steerer(col, name, currents, *args, dr_target = 1.0,  book_keeping_dev = None,
+                        linear_gradient=None, root_finder=None,
+                        logger=None,
+                        **kws):
     '''Testing if run doc has to be issued
     '''
 
@@ -268,7 +352,7 @@ def select_step_steerer(col, name, currents, *args, dr_target = 1.0,  book_keepi
         book_keeping_dev.dI.value = 0.0
         book_keeping_dev.steerer_name.value = 'unknown'
 
-        current_offset = (yield from steerer_current_offset(t_steerer))
+        current_offset = (yield from steerer_current_offset(t_steerer, logger=logger))
         book_keeping_dev.current_offset.value = float(current_offset)
 
         # That should store the current orbit....
@@ -283,7 +367,7 @@ def select_step_steerer(col, name, currents, *args, dr_target = 1.0,  book_keepi
             #: further down this plan builds on previous history
 
             orbit.clearOffset()
-            yield from step_steerer(t_steerer, [0], *args,  current_offset = current_offset, **kws)
+            yield from step_steerer(t_steerer, [0], *args,  current_offset = current_offset, logger=logger,**kws)
 
             # Find the maximum requested step
             scaled_currents = copy.copy(currents)
@@ -293,7 +377,10 @@ def select_step_steerer(col, name, currents, *args, dr_target = 1.0,  book_keepi
             val = None
             book_keeping_dev.mode.value = 'searching_scale'
 
-            val = (yield from steerer_search_step(t_steerer, currents_max, *args, current_offset=current_offset, dr_target=dr_target, **kws))
+            val = (yield from steerer_search_step(t_steerer, currents_max, *args, current_offset=current_offset, dr_target=dr_target,
+                                                  linear_gradient=linear_gradient, root_finder=root_finder,
+                                                  logger=logger,
+                                                  **kws))
 
             if val is not None:
                 current_step, total_scale = val
@@ -312,13 +399,15 @@ def select_step_steerer(col, name, currents, *args, dr_target = 1.0,  book_keepi
             steps = [c_max, c_min] * n_loops + [current_offset]
             hysteresis_currents = np.array(steps, np.float_)
 
+            logger.info(f'Executing hystersis {hysteresis_currents.min()} {hysteresis_currents.max()}')
             book_keeping_dev.mode.value = 'hysteresis_loop'
             for cur in hysteresis_currents:
-                yield from bps.mv(t_steerer.setpoint, cur)
+                yield from bps.checkpoint()
+                yield from bps.mv(t_steerer, cur)
 
             book_keeping_dev.mode.value = 'store_data'
             # Take the data over all the requested currents
-            yield from step_steerer(t_steerer, scaled_currents[0:], *args,  current_offset = current_offset, **kws)
+            yield from step_steerer(t_steerer, scaled_currents[0:], *args,  current_offset = current_offset, logger=logger,**kws)
 
         try:
             r = (yield from _run_inner())
@@ -326,7 +415,7 @@ def select_step_steerer(col, name, currents, *args, dr_target = 1.0,  book_keepi
             book_keeping_dev.steerer_name.value = 'restore_data'
             # Should be there but if everything goes wrong ...
             # should be outside this function
-            yield from bps.mv(t_steerer.setpoint, current_offset)
+            # yield from bps.mv(t_steerer, current_offset)
 
 
     return (yield from _run())
@@ -355,6 +444,11 @@ def loop_steerers(detectors, col, num_readings = 1, md = None,
     else:
         current_steps = np.asarray(current_steps)
 
+    kws_store = copy.copy(kws)
+    # Devices can not be put to the keywords ...
+    kws_store.pop('linear_gradient', None)
+    kws_store.pop('root_finder', None)
+    kws_store.pop('logger', None)
     _md = {'detectors': [det.name for det in detectors],
           'num_readings': num_readings,
           'plan_args': {
@@ -365,7 +459,7 @@ def loop_steerers(detectors, col, num_readings = 1, md = None,
               'current_val_horizontal'   : current_val_horizontal,
               'current_val_vertical'     : current_val_vertical,
               'current_steps'            : current_steps,
-              'keywords'                 : kws,
+              'keywords'                 : kws_store,
           },
           'plan_name': 'response_matrix',
           'hints': {}

@@ -1,7 +1,7 @@
 """Measure the response matrix
 """
 import logging
-# logging.basicConfig(level = 'DEBUG')
+# logging.basicConfig(level = 'INFO')
 import matplotlib
 matplotlib.use("Qt5Agg")
 import matplotlib.pyplot as plt
@@ -18,6 +18,7 @@ from bact2.ophyd.devices.utils import book_keeping_dev
 # from bact2.ophyd.devices.pp import steerer
 
 from bact2.ophyd.devices.pp.bpm import BPMStorageRing
+from bact2.ophyd.devices.utils.optimizers import LinearGradient, CautiousRootFinder
 from bact2.bluesky.live_plot import line_index
 from bact2.bluesky.live_plot.bpm_plot import BPMOffsetPlot, BPMOrbitOffsetPlot
 from bact2.bluesky.plans.loop_steerers import loop_steerers
@@ -37,6 +38,8 @@ def main():
     col = steerers.SteererCollection(name = "sc")
     bpm = BPMStorageRing(name = "bpm")
     tn = tunes.TuneMeasurement(name = 'tune')
+
+    cr = CautiousRootFinder(name='cr')
 
     t_beam = beam.Beam(name = 'beam')
 
@@ -110,7 +113,7 @@ def main():
     watch_beam = SuspendFloor(t_beam.current.readback, 1, resume_thresh = 2)
     RE.install_suspender(watch_beam)
     # RE.log.setLevel("DEBUG")
-    # RE.log.setLevel("INFO")
+    RE.log.setLevel("INFO")
 
 
     bec = BestEffortCallback()
@@ -136,16 +139,19 @@ def main():
     det = [bpm,
            tn,
            col,
+           # lg,
+           # cr,
            #bk_dev
     ] #, col.selected, col.sel.dev]
 
     h_st = steerers.horizontal_steerer_names
     v_st = steerers.vertical_steerer_names
 
-    n_st = len(h_st + v_st) 
+
+    n_st = len(h_st + v_st)
     num = 3
     repeat = 2
-    try_scan = False
+    try_scan = True
 
     n_st2 = n_st
     if try_scan:
@@ -154,20 +160,26 @@ def main():
         #v_st = []
         num = 2
         repeat = 1
-        n_st2 = len(h_st + v_st) 
+        n_st2 = len(h_st + v_st)
+
+    # Make all steerers setting back to last value in cast of stop is requested
+    for name in h_st + v_st:
+        st = getattr(col.steerers, name)
+        st.set_back.value = True
+        st.log = RE.log
 
     print(f'Total number of steeres {n_st} but  only executing using {n_st2}')
 
     comment = 'Data taking seems to work now. First run over all steerers (except for dipole steerers)'
-    comment = '''Data taking seems to work now. That's why I had looked into trying to optimze 
+    comment = '''Data taking seems to work now. That's why I had looked into trying to optimze
     the current steps. Now data taking starts to get useful.
     '''
     comment = 'trying to run enough points to estimate the non linearity'
-
+    comment = 'trying to use difference between steerer setpoint and readback to go ahead'
     md = {
         'operator' : 'Pierre Begemothovitsch',
         'target' : 'loco development',
-        'step' :  'second try of measurement campaign',
+        'step' :  'development of code, upgrade to better readability',
         'try_scan' : try_scan,
         'comment' : comment
 
@@ -179,12 +191,16 @@ def main():
                                 -.75, -.5,  -.25,  0])
     # current_steps = np.array([0, .5, 1, .5, -.5, -1, -.5, 0])
     # current_steps = np.array([0, 1,  -1,  0])
+    cr.log = RE.log
+
     for i in range(repeat):
         runs = RE(
             loop_steerers(det, col, horizontal_steerer_names = h_st, vertical_steerer_names = v_st, num_readings = num,
                           current_val_horizontal = current_val_horizontal, current_val_vertical = current_val_vertical,
-                          current_steps = current_steps, dr_target=2,
-                          book_keeping_dev = bk_dev
+                          current_steps = current_steps, dr_target=.2,
+                          book_keeping_dev = bk_dev, root_finder=cr,
+                          logger=RE.log
+                          # linear_gradient=lg,
             ),
             plots,
             **md
