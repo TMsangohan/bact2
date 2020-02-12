@@ -115,7 +115,9 @@ class Steerer( PowerConverter ):
     #: shall the compomnent be set back
     set_back = Cpt(Signal, name='set_bak', value=False, kind=Kind.config)
     eps_rel = Cpt(Signal, name='eps_rel', value=2e-3)
-    eps_abs = Cpt(Signal, name='eps_abs', value=2e-4)
+    #: execution stopped with a difference of 0.7 %
+    #: at a value of 0.13
+    eps_abs = Cpt(Signal, name='eps_abs', value=1e-2)
 
     def __init__(self, *args, **kwargs):
         # 10 ms is way too short

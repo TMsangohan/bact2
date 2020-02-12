@@ -120,8 +120,6 @@ def step_steerer(steerer, currents, detectors, num_readings, current_offset = No
 
 
 
-
-
 def steerer_search_step(steerer, start_current, detectors, num_readings, bpm_prefix = 'bpm_waveform', dr_target = 1.0,
                         dr_scale_max = 25, dr_eps = 1e-2, eps_rel=.1, eps_clip = 1e-4,
                         current_offset  = None, book_keeping_dev = None, linear_gradient=None, root_finder=None,logger=None):
@@ -129,14 +127,11 @@ def steerer_search_step(steerer, start_current, detectors, num_readings, bpm_pre
 
     Todo:
        Fix: detectors should not change during run I guess
+       Use a separate stream for the search
     """
-
-
     det = [steerer] + detectors
 
     st_name = steerer.name
-
-
     ref_value = steerer.setpoint.value
     root_finder.x0.value = start_current + ref_value
 
@@ -188,138 +183,11 @@ def steerer_search_step(steerer, start_current, detectors, num_readings, bpm_pre
     r = the_root.root
     d_current = r - ref_value
     book_keeping_dev.dI.value = float(d_current)
-
     total_scale = d_current/start_current
-
-
     logger.info(f'Steerer {st_name} found current {the_root} total scale {total_scale}')
-
     book_keeping_dev.scale_factor.value = total_scale
 
     return the_root, total_scale
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-    d_current = r
-
-    d_current = start_current
-    last_scale = 1
-
-    assert(current_offset is not None)
-
-    assert(dr_scale_max > 0)
-    assert(eps_rel > 0)
-    assert(dr_eps > 0)
-
-    value_clipped = False
-
-    limits = None
-    limits = steerer.setpoint.limits
-    print(steerer)
-    print(steerer.setpoint)
-    assert((np.absolute(limits)>1e-8).all())
-    dl = limits[1] - limits[0]
-    assert(dl>1e-8)
-
-    total_scale = 1.0
-    for i in range(5):
-        t_current_test = d_current + current_offset
-
-        assert(limits is not None)
-        # if limits is not None:
-        t_current = np.clip(t_current_test, *limits)
-        d_current = t_current - current_offset
-
-        book_keeping_dev.dI.value = float(d_current)
-
-        txt = (
-            f'Setting steerer to I = {t_current:.5f} =' +
-            f' {current_offset:.5f} + {d_current:.5f} requested {t_current_test:.5f}'
-        )
-        logger.info(txt)
-
-        diff = t_current_test - t_current
-        adiff = np.absolute(diff)
-
-        if adiff > eps_clip:
-            value_clipped = True
-            total_scale = (d_current / start_current)
-            total_scale = total_scale * .9
-            d_current = d_current *.9
-            txt = (
-                f'Steerer {steerer.name} requested current {t_current_test:.5f}'
-                f' clipped to {t_current:.5f} diff {diff:e}'
-                f' d_current {d_current:.5f} total scale {total_scale:.3f}'
-            )
-            logger.warning(txt)
-            print(txt)
-            break
-        yield from bps.mv(steerer.setpoint, t_current)
-
-        # Let's check if the first reading of the bpm is really useful
-        # I guess first reading is too fast!
-
-
-        assert(num_readings > 1)
-
-        for i in range(num_readings):
-            val = ( yield from bps.trigger_and_read(det) )
-
-        dr = calculate_orbit_offset(val)
-        dr_max = dr.max()
-        print('Step found maximum offset {:.3f} mm for a current step of {:.3f}'.format(dr_max, d_current))
-
-        if dr_max < dr_eps:
-            print('Step found maximum offset {:.3f} mm < dr_eps {:.3f} no scaling'.format(dr_max, dr_eps))
-            yield from bps.null()
-            return None
-
-        dr_scale = dr_target / dr_max
-        d_current = d_current * dr_scale
-
-        print('Testing scaling current by {:.3f} current step {:.3f}'.format(dr_scale, d_current))
-        # Stop if change is less than 10 %
-        dr_band = np.absolute(dr_scale) - 1
-        dra = abs(dr_band)
-        eps_rel = .1
-        if dra < eps_rel:
-            # Todo:
-            #    Improve it to respect hysteresis loop
-            #    e.g.
-            fmt = 'Last scaling step only changed by {:.3f} < {:.3f} (total scaling factor {:.3f})'
-            txt = fmt.format(dr_scale, eps_rel, total_scale)
-            logger.info(txt)
-            break
-
-        total_scale = (d_current / start_current)
-        book_keeping_dev.scale_factor.value = total_scale
-        if np.absolute(total_scale) > dr_scale_max:
-            d_current = dr_scale_max * start_current
-            fmt = 'Limiting current scaling to {:.3f} (scaling factor {:.3f} requested): making current step {:.3f}'
-            txt = fmt.format(dr_scale_max, total_scale, d_current)
-            # This line is essential!
-            total_scale = dr_scale_max
-            print(txt)
-            break
-
-
-    return d_current, total_scale
 
 def select_step_steerer(col, name, currents, *args, dr_target = 1.0,  book_keeping_dev = None,
                         linear_gradient=None, root_finder=None,
