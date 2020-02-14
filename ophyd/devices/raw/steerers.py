@@ -8,9 +8,8 @@ Todo:
 
 '''
 from ophyd import Signal, Device, Component as Cpt, Kind
-#from ophyd.ophydobj import Kind
 from ophyd.areadetector.base import ad_group
-from ophyd.device import  DynamicDeviceComponent as DDC
+from ophyd.device import DynamicDeviceComponent as DDC
 from ophyd.status import AndStatus
 
 from .power_converter import PowerConverter
@@ -29,21 +28,19 @@ horizontal_steerer_names = [name.lower() for name in horizontal_steerers]
 vertical_steerer_names   = [name.lower() for name in vertical_steerers]
 
 
-
-class SignalProxy( Signal ):
+class SignalProxy(Signal):
     """Proxy the signal to a
     """
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.__signal_to_proxy = None
 
-
     @property
     def signal_to_proxy(self):
         if self.__signal_to_proxy is None:
-            raise AssertionError("No signal to proxy found in {}".format(self.name))
+            txt = f"No signal to proxy found in {self.name}"
+            raise AssertionError(txt)
         return self.__signal_to_proxy
-
 
     @signal_to_proxy.setter
     def signal_to_proxy(self, sig):
@@ -60,13 +57,6 @@ class SignalProxy( Signal ):
     @property
     def limits(self):
         return self.signal_to_proxy.limits
-
-        p = self.__signal_to_proxy
-        if p is None:
-            limits = [-0.0, 0.0]
-        else:
-            limits =self.signal_to_proxy.limits
-        return limits
 
     def set(self, *args, **kwargs):
         sig = self.signal_to_proxy
@@ -87,7 +77,7 @@ class SignalProxy( Signal ):
         """
         sig = self.signal_to_proxy
         proxy_name = self.signal_to_proxy.name
-        # print(proxy_name, self.name)
+
         r = sig.read()
         d = {}
         # It is essential not to return the data also for the selected steerer
@@ -102,19 +92,20 @@ class SignalProxy( Signal ):
         self.log.debug(fmt.format(self.name, d))
         return d
 
-    #def __getattr__(self, name):
-    #    print("Getting name", name)
-    #    return getattr(self.signal_to_proxy, name)
 
-
-class Steerer( PowerConverter ):
+class Steerer(PowerConverter):
     """Steerer with certain settings
     """
+
     #: reference value to store
     rv = Cpt(Signal, name='ref_val', value=np.nan)
-    #: shall the compomnent be set back
+
+    #: shall the component be set back
     set_back = Cpt(Signal, name='set_bak', value=False, kind=Kind.config)
+
+    #: acceptable relative error
     eps_rel = Cpt(Signal, name='eps_rel', value=2e-3)
+
     #: execution stopped with a difference of 0.7 %
     #: at a value of 0.13
     eps_abs = Cpt(Signal, name='eps_abs', value=1e-2)
@@ -125,7 +116,6 @@ class Steerer( PowerConverter ):
         kwargs.setdefault('settle_time', .5)
         kwargs.setdefault('timeout', 20)
         super().__init__(*args, **kwargs)
-
 
     def setToStoredValue(self):
         if self.set_back.value:
@@ -141,17 +131,18 @@ class Steerer( PowerConverter ):
         '''
 
         Warning:
-            If the call to super is not here the code will stop
-            working
+            If the call to super is not here proper plans will stop
+            working at the second iteration
         '''
         return super().unstage()
 
     def stop(self, success=False):
         self.setToStoredValue()
 
-class _SelectedSteerer( Device ):
-    setpoint = Cpt(SignalProxy, name='set',  value = np.nan, kind = 'hinted', lazy = False)
-    readback = Cpt(SignalProxy, name='rdbk', value = np.nan, kind = 'hinted', lazy = False)
+
+class _SelectedSteerer(Device):
+    setpoint = Cpt(SignalProxy, name='set',  value=np.nan, kind='hinted', lazy=False)
+    readback = Cpt(SignalProxy, name='rdbk', value=np.nan, kind='hinted', lazy=False)
 
     def __init__(self, *args, **kwargs):
         self._selected_steerer = None
@@ -181,18 +172,16 @@ class _SelectedSteerer( Device ):
         self._selected_steerer = steerer
         self.subscribeSelected()
 
-
     def trigger(self):
         st_set = self.setpoint.trigger()
         st_rbk = self.readback.trigger()
         status = AndStatus(st_set, st_rbk)
         return status
 
-
     def read(self):
         r = super().read()
-        tup = self.__class__.__name__, __name__, r
-        txt = '{}:{}.read() returns = {}'.format(*tup)
+        cls_name = self.__class__.__name__
+        txt = f'{cls_name}:{__name__}.read() returns = {r}'
         self.log.debug(txt)
         return r
 
@@ -209,13 +198,11 @@ class _SelectedSteerer( Device ):
     def __del__(self):
         self.unsubscribeSelected()
 
-class SelectedSteerer( Device ):
+
+class SelectedSteerer(Device):
     """Pass it through ...
     """
-    dev = Cpt(_SelectedSteerer, '', #egu='A',
-              #setting_parameters = 0.1,
-              # timeout = 2
-    )
+    dev = Cpt(_SelectedSteerer, '')
 
     def trigger(self):
         return self.dev.trigger()
@@ -224,25 +211,25 @@ class SelectedSteerer( Device ):
         self.dev.stop(success=success)
 
 
-
-class SteererCollection( Device ):
-    steerers = DDC(ad_group(Steerer, t_steerers, kind=Kind.normal, lazy=False),
-        doc='all steerers', default_read_attrs = ()#tuple(t_steerer_names),
+class SteererCollection(Device):
+    steerers = DDC(
+        ad_group(Steerer, t_steerers, kind=Kind.normal, lazy=False),
+        doc='all steerers', default_read_attrs=(),
     )
+
     steerer_names = Cpt(Signal, name='steerer_names', value=t_steerer_names, kind=Kind.config)
-    selected = Cpt(Signal, name='selected', value ='none selected')
-    sel = Cpt(SelectedSteerer, name = 'sel_st')
+    selected = Cpt(Signal, name='selected', value='none selected')
+    sel = Cpt(SelectedSteerer, name='sel_st')
 
     _default_config_attrs = ('steerer_names',)
-    _default_read_attrs = ('selected', 'sel') #+ tuple(['steerers.' + name for name in t_steerer_names])
+    _default_read_attrs = ('selected', 'sel')
+
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self._setDefaultSteerer()
 
-
     def _setDefaultSteerer(self):
         self._setSteererByName(t_steerers[0][0])
-
 
     def _setSteererByName(self, name):
         try:
@@ -266,14 +253,13 @@ class SteererCollection( Device ):
         status = self.selected.set(t_name)
         return status
 
-
     def trigger_all_components_update(self):
         status = None
         for name in self.steerers.component_names:
             cpt = getattr(self.steerers, name)
             sig_rdbk = cpt.readback
             r = trigger_on_update(sig_rdbk)
-            if status == None:
+            if status is None:
                 status = r
             else:
                 status = AndStatus(status, r)
@@ -284,7 +270,6 @@ class SteererCollection( Device ):
         fmt = "{}.trigger: {} "
         self.log.debug(fmt.format(self.name, status))
         return status
-
 
     def stop(self, success=False):
         self.sel.stop(success=success)

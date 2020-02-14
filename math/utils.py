@@ -1,10 +1,21 @@
 import numpy as np
 
+
 def compare_value(value, reference_value, *, eps_abs=None, eps_rel=None):
     '''compare if values are equal within given limits
 
+    Args:
+        value:           value to check
+        reference_value: reference value
+        eps_abs:         absolute tolerance
+        eps_rel:         relative tolerance
+
+    Returns:
+         0 if in range
+         1 if value > reference_value
+        -1 if value < reference_value
     Todo:
-        Check if not available in a standared library function
+        Check if not available in a standard library function
     '''
     assert(eps_abs is not None)
     assert(eps_rel is not None)

@@ -7,6 +7,7 @@ import logging
 
 logger = logging.getLogger()
 
+
 class OphydInvalidParameter(ValueError, errors.OpException):
     """given parameter was invalid
     """
@@ -18,7 +19,8 @@ class OphydMethodNotOverloaded(AssertionError, errors.OpException):
     """
     pass
 
-#t_super = Device
+# t_super = Device
+
 
 #: It has to be PVPositionerPC so that it will work
 t_super = PVPositionerPC
@@ -65,21 +67,21 @@ class DoneBasedOnReadback(t_super):
 
         super().__init__(*args, **kws)
 
-
         setpar = self._checkSettingParameters(setting_parameters)
         if setpar is None:
-            fmt = "%s._checkSettingParameters must return vaild parameters (returned None)"
-            txt = fmt % (self.__class__.__name__,)
+            cls_name = self.__class__.__name__
+            txt = (
+                f'{cls_name}._checkSettingParameters must return'
+                ' valid parameters (returned None)'
+            )
             raise AssertionError(txt)
 
         self._setting_parameters = setpar
         self._timeout = timeout
         self._checkSetup()
 
-
         # Required to trace the status of the device
         self._moving = None
-
 
     def _checkSetup(self):
         """check that instance contains required variables
@@ -93,7 +95,6 @@ class DoneBasedOnReadback(t_super):
 
         assert(self._timeout > 0)
 
-
     def _checkSettingParameters(self, setting_parameters):
         """Check and store setting Parameters
 
@@ -105,7 +106,6 @@ class DoneBasedOnReadback(t_super):
         raise OphydMethodNotOverloaded("Overload this method")
         return setting_parameters
 
-
     def _positionReached(self, *args, **kws):
         """check that the position has been reached
 
@@ -115,7 +115,6 @@ class DoneBasedOnReadback(t_super):
         """
         raise OphydMethodNotOverloaded("Overload this method")
 
-
     def set(self, value):
         """
 
@@ -123,15 +122,17 @@ class DoneBasedOnReadback(t_super):
             :class:`ophyd.status.SubscriptionStatus`
 
         """
-        def callback(*args,**kws):
+        def callback(*args, **kws):
 
             pos_valid = self._positionReached(*args, **kws)
 
-            tup = self.__class__.__name__, args, kws, self._moving, pos_valid
-            txt = "%s:set cb: args %s  kws %s: self._moving %s pos_valid %s" % tup
-            #print(txt)
-
+            cls_name = self.__class__.__name__
+            txt = (
+                f'{cls_name}:set cb: args {args}  kws {kws}:'
+                f' self._moving {self._moving} pos_valid {pos_valid}'
+                )
             self.log.debug(txt)
+
             if self._moving and pos_valid:
                 self._moving = False
                 return True
@@ -139,90 +140,42 @@ class DoneBasedOnReadback(t_super):
                 self._moving = True
             return False
 
-        pos_valid = self._positionReached(check_set_value = value)
-
+        pos_valid = self._positionReached(check_set_value=value)
 
         if pos_valid:
             status = Status()
             status.done = 1
             status.success = 1
-            tup = self.__class__.__name__, value,
-            txt = "%s: no motion required for value %s" % tup
+            cls_name = self.__class__.__name__
+            txt = f"{cls_name}: no motion required for value {value}"
             self.log.info(txt)
             return status
 
-
         self.log.info(f'settle time {self.settle_time}')
         stat_rbk = SubscriptionStatus(self.readback, callback,
-                                    timeout=self._timeout,
-                                    settle_time=self.settle_time)
+                                      timeout=self._timeout,
+                                      settle_time=self.settle_time)
         stat_setp = self.setpoint.set(value, timeout=self._timeout)
 
         status = AndStatus(stat_rbk, stat_setp)
-        tup = self.__class__.__name__, value, status
-        txt = "%s:set cb: value %s status = %s" % tup
-        #print(txt)
-        if logger: logger.debug(txt)
+        cls_name = self.__class__.__name__
+        txt = f"{cls_name}:set cb: value {value} status = {status}"
+        # print(txt)
+        if logger:
+            logger.debug(txt)
 
         return status
+
 
 class ReachedSetpoint(DoneBasedOnReadback):
     """Setpoint within some absolute precision
 
-    Warning:
-        Its currently not unterstood if a value can be set and
-        read back if the change is smaller than the value the
-        IOC considers significant
+    Obsolete class use :class:`ReachedSetpointEPS` instead
     """
+    def __init__(self, *args, **kwargs):
+        msg = 'Obsolete class use ReachedSetpointEPS instead'
+        raise NotImplementedError(msg)
 
-    def _correctReadback(self, val):
-        return val
-
-    def _positionReached(self, *args, **kws):
-        """position within given range?
-        """
-
-        limit = self._setting_parameters
-
-        rbk = self.readback.value
-        rbk = self._correctReadback(rbk)
-
-        check_set_value = kws.pop("check_set_value", None)
-        if check_set_value is None:
-            setp = self.setpoint.value
-        else:
-            setp = check_set_value
-
-
-        diff = abs(rbk - setp)
-        flag = diff < limit
-
-        c_name = self.__class__.__name__
-        setp, rbk, diff, limit, flag
-        txt = (
-            f'{c_name}:_positionReached: set {setp} rbk {rbk} diff {diff} limit {limit} position valid {flag}'
-        )
-        # print(txt)
-
-        logger = self.logger
-        if logger is not None:
-            logger.info(txt)
-
-        return flag
-
-    def _checkSettingParameters(self, setting_parameters):
-        """Absolute value for setting parameter
-
-        And thus just a float
-        """
-        try:
-            t_range = float(setting_parameters)
-            assert(t_range >0)
-        except ValueError as des:
-            msg = "Expected a single float as setting parameter but got %s: error %s"
-            raise OphydInvalidParameter(msg %(setting_parameters, des.mesg))
-
-        return t_range
 
 class ReachedSetpointEPS(DoneBasedOnReadback):
     """Setpoint within some absolute and relative precision
@@ -252,7 +205,9 @@ class ReachedSetpointEPS(DoneBasedOnReadback):
         flag = t_cmp == 0
         c_name = str(self.__class__)
         txt = (
-            f'{c_name}:_positionReached: set {setp} rbk {rbk} eps: abs {eps_abs} rel {eps_rel} comparison {t_cmp} position valid {flag}'
+            f'{c_name}:_positionReached: set {setp} rbk {rbk} '
+            f'eps: abs {eps_abs} rel {eps_rel} '
+            f'comparison {t_cmp} position valid {flag}'
         )
         # print(txt)
 
@@ -267,7 +222,7 @@ class ReachedSetpointEPS(DoneBasedOnReadback):
         eps_abs = self.eps_abs.value
         try:
             t_range = float(eps_abs)
-            assert(t_range >0)
+            assert(t_range > 0)
         except ValueError as des:
             msg = f"Expected eps_abs {eps_abs}  >0 got: error {des}"
             raise OphydInvalidParameter(msg)
@@ -275,7 +230,7 @@ class ReachedSetpointEPS(DoneBasedOnReadback):
         eps_rel = self.eps_rel.value
         try:
             t_range = float(eps_rel)
-            assert(t_range >0)
+            assert(t_range > 0)
         except ValueError as des:
             msg = f"Expected eps_rel {eps_rel}  >0 got: error {des}"
             raise OphydInvalidParameter(msg)

@@ -5,12 +5,12 @@
 
 import numpy as np
 from ophyd import Component as Cpt, Device
-from ophyd import EpicsSignal, EpicsSignalRO
+from ophyd import EpicsSignal, EpicsSignalRO, Signal
 
-from ..utils.ReachedSetPoint import ReachedSetpoint
+from ..utils.ReachedSetPoint import ReachedSetpointEPS
 
 
-class ReachedSetpointWithOffsetCorrection( ReachedSetpoint ):
+class ReachedSetpointWithOffsetCorrection(ReachedSetpointEPS):
     """Correct master clock read back for orbit corrections
     """
     def _correctReadback(self, val):
@@ -37,17 +37,35 @@ class MasterClockFrequency( ReachedSetpointWithOffsetCorrection ):
     offset must be deduced from the read back so that the setpoint and
     readback can match.
 
-
-    __init__ requires to set setting_parameters.
-
-    Check :class:`device_utils.ReachedSetpoint` for details of the init
-    keywords.
     """
     setpoint = Cpt(EpicsSignal,   'MCLKHX251C:freq')
     readback = Cpt(EpicsSignalRO, 'MCLKHX251C:hwRdFreq')
 
     #: Offset tries to compensate the lengthing of the machine
     offset   = Cpt(EpicsSignalRO, 'MCLKHX251C:sum_off')
+
+    def annotate_eps(self, d):
+        egu = self.egu
+        name = self.name
+
+        for cpt_suffix in ['eps_abs', 'eps_rel']:
+            entry = name + '_' + cpt_suffix
+            d[entry]['units'] = self.egu
+            d[entry]['units'] = self.egu
+            d[entry]['precision'] = 5
+            d[entry]['precision'] = 5
+            d[entry]['upper_ctrl_limit'] = 100.0
+            d[entry]['lower_ctrl_limit'] = 0.0
+        return d
+
+    def describe(self):
+        r = super().describe()
+        # Annotate eps_rel and eps_abs information
+        # can not be done directly
+
+        r = self.annotate_eps(r)
+        return r
+
 
 class MasterClock(Device):
     """BESSY II Master clock
@@ -61,13 +79,9 @@ class MasterClock(Device):
     """
     _ref_freq = 499630
     _df_max = 4
-    frequency = Cpt(MasterClockFrequency, # name = 'MCLKHX251C',
-                    egu='kHz', limits = (_ref_freq - _df_max, _ref_freq + _df_max),
-                    #settle_time = 5.0
-                    #setting_parameters = 1.0
-                    setting_parameters = 0.1,
-                    timeout = 2
-    )
-    #frequency.done_value = 1
-
-
+    frequency = Cpt(MasterClockFrequency, name='f', timeout=2, egu='kHz')
+    # name = 'MCLKHX251C',
+    # limits = (_ref_freq - _df_max, _ref_freq + _df_max),
+    # settle_time = 5.0
+    # setting_parameters = 1.0
+    # frequency.done_value = 1
