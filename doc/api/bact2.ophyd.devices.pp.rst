@@ -46,23 +46,3 @@ bact2\.ophyd\.devices\.pp\.life_time
     :members:
     :undoc-members:
     :show-inheritance:
-
-
-
-
-bact2\.ophyd\.devices\.pp\.VectorSignalRO
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-.. automodule:: bact2.ophyd.devices.pp.VectorSignalRO
-    :members:
-    :undoc-members:
-    :show-inheritance:
-
-
-bact2\.ophyd\.devices\.pp\.VectorSignalR0
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-.. automodule:: bact2.ophyd.devices.pp.VectorSignalR0
-    :members:
-    :undoc-members:
-    :show-inheritance:
