@@ -122,6 +122,8 @@ class BPMChannel( Device ):
 
     #: gains for the channels
     gain   = Cpt(Signal, name = 'gain', value = 1.0)
+
+    #: offset of the BPM from the ideal orbit
     offset = Cpt(Signal, name = 'offset', value = 0.0)
 
     #: scale bits to mm
