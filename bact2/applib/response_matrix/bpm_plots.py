@@ -29,7 +29,7 @@ import os.path
 from dataclasses import dataclass
 
 logger = logging.getLogger('bact2')
-logger.setLevel(logging.DEBUG)
+# logger.setLevel(logging.DEBUG)
 
 
 def max_current(steerer_type):
