@@ -5,9 +5,38 @@ import logging
 
 logger = logging.getLogger('bact2')
 
-def calculate_bpm_one_corr(df_sel, coor=None):
+
+def calculated_indep_relative_value(df, indep_column=None, indep_ref_column=None):
+    assert(indep_column is not None)
+
+    dI = df.loc[:, indep_column] 
+    if indep_ref_column is None:
+        return dI
+
+    # for loco this is bk_dev_current_offset
+    offset = df.loc[:, indep_ref_column]
+
+    try:
+        # for loco this is sc_sel_dev_setpoint
+        dI = dI - offset
+    except Exception:
+        txt = (
+            f'indep calculation failed using column {indep_column} for the'
+            f' independent value and {indep_ref_column} for the dependent column'
+            f' indep values {dI}'
+        )
+        logger.error(txt)
+        raise
+
+    return dI
+
+def calculate_bpm_one_corr(df_sel, coor=None, 
+                           indep_column=None, indep_ref_column=None):
+
     assert(coor is not None)
-    dI = df_sel.sc_sel_dev_setpoint - df_sel.bk_dev_current_offset
+
+    dI = calculated_indep_relative_value(df_sel, indep_column=indep_column,
+                                         indep_ref_column=indep_ref_column)
     if coor == 'x':
         bpm = df_sel.bpm_waveform_x_pos
     elif coor == 'y':
@@ -19,8 +48,30 @@ def calculate_bpm_one_corr(df_sel, coor=None):
 
     # Critical for rcond determination
     dI = np.array(dI.values, np.float_)
-    gain, offset = np.polyfit(dI, bpm, 1)
-    curve, slope, intercept = np.polyfit(dI, bpm, 2)
+
+    # Are sufficient data available? 
+    n_points = dI.shape[0]
+
+    m_measurements = bpm.shape[1]
+
+    fill_vals = np.zeros((m_measurements,), np.float_) + np.nan
+    offset = gain = fill_vals
+    curve = slope = intercept = fill_vals
+
+    if n_points < 2:
+        logger.info(f'Can not compute any fit for dI {dI} insufficient points')
+    elif n_points == 2:
+        txt = (
+            f'Can only compute linear fit for dI {dI}:'
+            f' insufficient points for cubic fit: {n_points} ==2'
+        )
+        logger.info(txt)
+
+    if n_points >= 2:
+        gain, offset = np.polyfit(dI, bpm, 1)
+    elif n_points >= 3:
+        curve, slope, intercept = np.polyfit(dI, bpm, 2)
+
     res = {
         'gain': gain, 'offset': offset,
         'curve': curve, 'slope': slope, 'intercept': intercept
@@ -29,15 +80,27 @@ def calculate_bpm_one_corr(df_sel, coor=None):
     return res
 
 
-def calculate_bpm(df_sel):
+def calculate_bpm(df_sel, **kws):
     result = {}
     for coor in ('x', 'y'):
-        r = calculate_bpm_one_corr(df_sel, coor)
+        r = calculate_bpm_one_corr(df_sel, coor, **kws)
         result[coor] = r
     return result
 
 
-def calc_bpm_gains(df, column_name='sc_selected'):
+def calc_bpm_gains(df, column_name=None, indep_column=None, 
+                    indep_ref_column=None):
+    '''
+
+    Todo:
+        make indep_column and indep_ref_column None by default
+    '''
+
+    assert(column_name is not None)
+    # loco script used it already in this manner 
+    # let's save it for testing
+    if column_name is None:
+        column_name = 'sc_selected'
 
     tdf = dfg.df_with_vectors_mean(df, column_name)
     columns = [
@@ -52,7 +115,14 @@ def calc_bpm_gains(df, column_name='sc_selected'):
     group = df.groupby(by=column_name)
     for key, index in group.groups.items():
         df_sel = df.loc[index, :]
-        result = calculate_bpm(df_sel)
+
+        logger.debug(
+            f'grouped by {column_name}:'
+            f' key {key} found {df_sel.shape[0]} entries'
+        )
+
+        result = calculate_bpm(df_sel, indep_column=indep_column,
+            indep_ref_column=indep_ref_column)
         df_ref.loc[key, 'bpm_gx'] = result['x']['gain']
         df_ref.loc[key, 'bpm_gy'] = result['y']['gain']
         df_ref.loc[key, 'bpm_ox'] = result['x']['offset']
@@ -90,9 +160,16 @@ def _calc_bpm_reference_p2(dI, intercept, slope, curve):
     return ref_val
 
 
-def calc_bpm_ref(df, ref, column_name='sc_selected'):
+def calc_bpm_ref(df, ref, column_name=None, 
+                 indep_column=None, indep_ref_column=None):
     '''reference data from fit data
     '''
+
+    assert(column_name is not None)
+
+    if column_name is None:
+        column_name = 'sc_selected'
+
     ndf = pd.DataFrame(index=df.index, columns=df.columns, dtype=np.object_)
 
     assert(ndf.shape == df.shape)
@@ -108,9 +185,10 @@ def calc_bpm_ref(df, ref, column_name='sc_selected'):
         # Now reference for each point
         sel = df.loc[index, :]
         # print(sel)
-        I = sel.sc_sel_dev_setpoint
-        I_ref = sel.bk_dev_current_offset
-        dI = I - I_ref
+
+        logger.info(f'grouped by {column_name}: key {key} found {sel.shape[0]} entries ')
+        dI = calculated_indep_relative_value(sel, indep_column=indep_column,
+                                             indep_ref_column=indep_ref_column)
 
         for coor in ('x', 'y'):
             offset = t_ref.loc[f'bpm_o{coor}']
@@ -150,12 +228,16 @@ def add_bpm_deviation_from_fit(df, copy=True):
     return df
 
 
-def add_bpm_scale(df, column_name='sc_selected', copy=True):
+def add_bpm_scale(df, column_name=None, copy=True):
 
     if copy:
         df = df.copy()
 
-    grp = df.groupby(by='sc_selected')
+    assert(column_name is not None)
+    if column_name is None:
+        column_name = 'sc_selected'
+
+    grp = df.groupby(by=column_name)
     for steerer_name, index in grp.groups.items():
         sel = df.loc[index, :]
         sel_ri = sel.loc[sel.ramp_index == 4, :]

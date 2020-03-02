@@ -11,6 +11,7 @@ def main():
     target_file_path = sys.argv[2]
 
     target_file_name = os.path.basename(target_file_path)
+    plot_dir = os.path.dirname(target_file_path)
     file_name, ext = os.path.split(target_file_name)
 
     # preprocess the name
@@ -29,7 +30,8 @@ def main():
     preprocess_timestamp = datetime.datetime.now()
     dtp = preprocess_timestamp - start_timestamp
 
-    bp.process_steerer(one_steerer, target_file_name=target_file_path)
+    bp.process_steerer(one_steerer, plot_dir=plot_dir, 
+                       target_file_name=target_file_name)
 
     dt = datetime.datetime.now() - start_timestamp
     print(f'plotting steerer {steerer_name} required {dt}'

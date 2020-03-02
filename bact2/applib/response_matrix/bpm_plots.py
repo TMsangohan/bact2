@@ -188,9 +188,7 @@ def process_steerer(df, target_file_name, plot_dir=None):
     cnt = int(cnt)
 
     assert(suffix == 'main')
-
-    if plot_dir is None:
-        plot_dir = '/home/mfp/Devel/github/data/response_matrix/'
+    assert(plot_dir is not None)
 
     one_steerer = df
 
