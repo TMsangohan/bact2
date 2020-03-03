@@ -32,15 +32,16 @@ class BPMComparison( Device ):
     '''Calculate the difference between storage ring and the collection
 
     '''
-    pck = Cpt(BPMStorageRing, name = 'packed')
-    col = Cpt(BPMCollectionForComparison, name = 'collection')
-    diff_x = Cpt(Signal, name = 'diff_x', value = [])
-    diff_y = Cpt(Signal, name = 'diff_y', value = [])
-    scale = Cpt(Signal, name = 'scale', value = 1.0)
+    pck = Cpt(BPMStorageRing, name='packed')
+    col = Cpt(BPMCollectionForComparison, name='collection')
+    diff_x = Cpt(Signal, name='diff_x', value=[])
+    diff_y = Cpt(Signal, name='diff_y', value=[])
+    scale = Cpt(Signal, name='scale', value=1.0)
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.col.names.value = [x.lower() for x in self.pck.waveform.names.value]
+        names = [x.lower() for x in self.pck.waveform.names.value]
+        self.col.names.value = names
 
     def updateDifference(self):
         wv = self.pck.waveform
@@ -66,9 +67,10 @@ class BPMComparison( Device ):
         stat = AndStatus(stat_pck, stat_trace)
         return stat
 
+
 def main():
 
-    bpm = BPMComparison(Device, name = 'cmp')
+    bpm = BPMComparison(Device, name='cmp')
 
     # Let's test if we are playing with offset
     # bpm.pck.waveform.x.offset.value = 0
@@ -94,7 +96,7 @@ def main():
     bpm_names = bpm.pck.waveform.names.value
     bpm_positions = bpm.pck.waveform.ds.value
 
-    class BPMComparisonPlot( bpm_plot.BPMComparisonPlot):
+    class BPMComparisonPlot(bpm_plot.BPMComparisonPlot):
         def __init__(self, *args, **kwargs):
             kwargs.setdefault('bpm_names', bpm_names)
             kwargs.setdefault('bpm_positions', bpm_positions)
@@ -103,16 +105,16 @@ def main():
     det = [bpm]
 
     ds_name = 'cmp_pck_waveform_ds'
-    plots  = [
-        BPMComparisonPlot("cmp_pck_waveform_x_pos", ds_name, ax = ax_x, legend_keys = ['packed']),
-        BPMComparisonPlot("cmp_pck_waveform_y_pos", ds_name, ax = ax_y, legend_keys = ['packed']),
-        BPMComparisonPlot("cmp_col_x", ds_name, ax = ax_x, legend_keys = ['single']),
-        BPMComparisonPlot("cmp_col_y", ds_name, ax = ax_y, legend_keys = ['single']),
-        BPMComparisonPlot("cmp_diff_x", ds_name, ax = ax_dx, legend_keys = ['diff']),
-        BPMComparisonPlot("cmp_diff_y", ds_name, ax = ax_dy, legend_keys = ['diff']),
+    plots = [
+        BPMComparisonPlot("cmp_pck_waveform_x_pos", ds_name, ax=ax_x, legend_keys=['packed']),
+        BPMComparisonPlot("cmp_pck_waveform_y_pos", ds_name, ax=ax_y, legend_keys=['packed']),
+        BPMComparisonPlot("cmp_col_x", ds_name, ax=ax_x, legend_keys=['single']),
+        BPMComparisonPlot("cmp_col_y", ds_name, ax=ax_y, legend_keys=['single']),
+        BPMComparisonPlot("cmp_diff_x", ds_name, ax=ax_dx, legend_keys=['diff']),
+        BPMComparisonPlot("cmp_diff_y", ds_name, ax=ax_dy, legend_keys=['diff']),
     ]
 
-    RE(bp.count(det, 10), plots)
+    RE(bp.count(det, 1), plots)
 
 
 if __name__ == '__main__':

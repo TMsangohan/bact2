@@ -15,7 +15,7 @@ class BPMComparisonPlot( LivePlot ):
     Todo:
         Investigate if such a plot should be provided for steerers too
     '''
-    def __init__(self, *args, bpm_names = None, bpm_positions = None, **kwargs):
+    def __init__(self, *args, bpm_names=None, bpm_positions=None, **kwargs):
 
         assert(bpm_names is not None)
         assert(bpm_positions is not None)
@@ -57,8 +57,9 @@ class BPMComparisonPlot( LivePlot ):
 
     def setBPMNamesAsXTicks(self):
         self.ax.set_xticks(self._bpm_positions)
-        self.ax.set_xticklabels(self._bpm_names, fontsize = 'small',
-                                verticalalignment = 'top', horizontalalignment='center')
+        self.ax.set_xticklabels(self._bpm_names, fontsize='small',
+                                verticalalignment='top',
+                                horizontalalignment='center')
         for tick in self.ax.get_xticklabels():
             tick.set_rotation(90)
 
@@ -89,7 +90,6 @@ class BPMComparisonPlot( LivePlot ):
         self.ax.axis(axis)
         self.ax.figure.canvas.draw_idle()
 
-
     def stop(self, doc):
         '''
 
@@ -99,7 +99,6 @@ class BPMComparisonPlot( LivePlot ):
         self.x_data = list(self.x_data)
         self.y_data = list(self.y_data)
         super().stop(doc)
-
 
 
 class _BPMPlots( line_index.PlotLineVsIndexOffset):
@@ -114,6 +113,7 @@ class _BPMPlots( line_index.PlotLineVsIndexOffset):
         except AttributeError:
             self.log = logger
 
+
 class BPMOrbitOffsetPlot( _BPMPlots ):
     '''Plot offset to orbit
 
@@ -121,12 +121,13 @@ class BPMOrbitOffsetPlot( _BPMPlots ):
     :class:`PlotLineVsIndexOffset`
     '''
 
+
 class BPMOffsetPlot(  _BPMPlots ):
     '''Show orbit change dues to steerer settings change
 
     When the selected steerer name changes the offset is reset
     '''
-    def __init__(self, *args, selected_steerer_name = None, **kwargs):
+    def __init__(self, *args, selected_steerer_name=None, **kwargs):
         super().__init__(*args, **kwargs)
 
         if selected_steerer_name is None:

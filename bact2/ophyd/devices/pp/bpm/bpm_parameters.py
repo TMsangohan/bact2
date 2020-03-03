@@ -36,7 +36,7 @@ def create_bpm_config():
 
     n_bpms = len(bpm_config.bpm_conf)
     data = np.zeros((n_bpms,), dtype=dtypes)
-    for i in range(l):
+    for i in range(n_bpms):
         entry = bpm_config.bpm_conf[i]
         data[i] = entry + (0, 0)
 
