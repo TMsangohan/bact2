@@ -17,7 +17,8 @@ import numpy as np
 import functools
 import enum
 
-def unpack_and_validate_data(packed_data, n_valid_items = None, indices = None):
+
+def unpack_and_validate_data(packed_data, n_valid_items=None, indices=None):
     """Split the packed data up to a matrix of bpm waveforms
 
     Args :
@@ -26,21 +27,24 @@ def unpack_and_validate_data(packed_data, n_valid_items = None, indices = None):
     Returns :
         mat : a matrix with the  different signals as row vectors
     """
-    mat1  = process_vector.unpack_vector_to_matrix(packed_data, n_vecs = 2)
-    with_data = mat1[0,:]
-    unused = mat1[1,:]
-    process_vector.check_unset_elements(unused, n_valid_rows = n_valid_items, unset_elements_value = 0)
+    mat1 = process_vector.unpack_vector_to_matrix(packed_data, n_vecs=2)
+    with_data = mat1[0, :]
+    unused = mat1[1, :]
+    process_vector.check_unset_elements(unused, n_valid_rows=n_valid_items,
+                                        unset_elements_value=0)
     del unused
 
-    mat = process_vector.unpack_vector_to_matrix(with_data, n_vecs = 8)
+    mat = process_vector.unpack_vector_to_matrix(with_data, n_vecs=8)
     if indices is not None:
         mat = np.take(mat, indices, axis=1)
     for col in mat:
         # Why does that currently not work ?
-        # process_vector.check_unset_elements(col, n_valid_rows = self.n_valid_bpms, unset_elements_value = 0)
+        # process_vector.check_unset_elements(col,
+        #                                    n_valid_rows=self.n_valid_bpms,
+        #                                    unset_elements_value=0)
+        #
         pass
     return mat
-
 
 
 class BPMStatusBits(enum.IntEnum):
@@ -92,6 +96,7 @@ class BPMChannelScale( DerivedSignalLinearBPM ):
 
         super().__init__(*args, **kwargs)
 
+
 class BPMChannel( Device ):
     '''A channel (or coordinate) of the bpm
 
@@ -116,25 +121,26 @@ class BPMChannel( Device ):
     _default_config_attrs = ('gain', 'offset', 'scale')
 
     #: Relative beam offset as measured by the beam position monitors
-    pos_raw = Cpt(Signal, name = 'pos_raw')
+    pos_raw = Cpt(Signal, name='pos_raw')
     #: and its rms value
-    rms_raw = Cpt(Signal, name = 'rms_raw')
+    rms_raw = Cpt(Signal, name='rms_raw')
 
     #: gains for the channels
-    gain   = Cpt(Signal, name = 'gain', value = 1.0)
+    gain   = Cpt(Signal, name='gain', value=1.0)
 
     #: offset of the BPM from the ideal orbit
-    offset = Cpt(Signal, name = 'offset', value = 0.0)
+    offset = Cpt(Signal, name='offset', value=0.0)
 
     #: scale bits to mm
-    bit_gain  = Cpt(Signal, name = 'bit_gain', value = 2**15/10)
+    bit_gain = Cpt(Signal, name='bit_gain', value=2**15/10)
 
     #: processed data: already in mm
-    pos = Cpt(BPMChannelScale, parent_attr = 'pos_raw', name = 'pos')
-    rms = Cpt(BPMChannelScale, parent_attr = 'rms_raw', name = 'rms')
+    pos = Cpt(BPMChannelScale, parent_attr='pos_raw', name='pos')
+    rms = Cpt(BPMChannelScale, parent_attr='rms_raw', name='rms')
 
     def trigger(self):
         raise NotImplementedError('Use BPMWaveform instead')
+
 
 class BPMWaveform(  bpm_raw.BPMPackedData ):
     """Measurement data for the beam position monitors
@@ -154,17 +160,17 @@ class BPMWaveform(  bpm_raw.BPMPackedData ):
     y = Cpt(BPMChannel, 'y')
 
     #: Data not sorted into the different channels
-    intensity_z = Cpt(Signal, name = "z")
-    intensity_s = Cpt(Signal, name = "s")
-    status      = Cpt(Signal, name = "status")
+    intensity_z = Cpt(Signal, name="z")
+    intensity_s = Cpt(Signal, name="s")
+    status      = Cpt(Signal, name="status")
 
     #: gains as found in the packed data. The gains for recalculating
     #: the values are found in the BPMChannels
-    gain_raw    = Cpt(Signal, name = "gain")
+    gain_raw    = Cpt(Signal, name="gain")
 
-    ds      = Cpt(Signal, name = 'ds', value = np.nan)
-    names   = Cpt(Signal, name = 'names', value = [])
-    indices = Cpt(Signal, name = 'indices', value = [])
+    ds      = Cpt(Signal, name='ds', value=np.nan)
+    names   = Cpt(Signal, name='names', value=[])
+    indices = Cpt(Signal, name='indices', value=[])
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -205,19 +211,19 @@ class BPMWaveform(  bpm_raw.BPMPackedData ):
         self.x.rms_raw.put(  mat[6])
         self.y.rms_raw.put(  mat[7])
 
-
     def checkAndStorePackedData(self, packed_data):
 
         indices = self.indices.value
         if len(indices) == 0:
             indices = None
 
-        mat = unpack_and_validate_data(packed_data, n_valid_items = self.n_valid_bpms,
-                                       indices = indices)
+        mat = unpack_and_validate_data(packed_data,
+                                       n_valid_items=self.n_valid_bpms,
+                                       indices=indices)
         return self.storeDataInWaveforms(mat)
 
     def trigger(self):
-        status_processed = DeviceStatus(self, timeout = 5)
+        status_processed = DeviceStatus(self, timeout=5)
 
         def check_data(*args, **kws):
             """Check that the received data match the expected ones
@@ -235,7 +241,6 @@ class BPMWaveform(  bpm_raw.BPMPackedData ):
             status_processed.done = True
             status_processed._finished()
 
-
         status = super().trigger()
         status.add_callback(check_data)
 
@@ -244,8 +249,8 @@ class BPMWaveform(  bpm_raw.BPMPackedData ):
 
 
 class BPMStorageRing( Device ):
-    stat = Cpt(bpm_raw.BPMStatistics, "BPMZR", name = "stat")
-    waveform = Cpt(BPMWaveform, "MDIZ2T5G", name = "wavefrom")
+    stat = Cpt(bpm_raw.BPMStatistics, "BPMZR", name="stat")
+    waveform = Cpt(BPMWaveform, "MDIZ2T5G", name="wavefrom")
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)

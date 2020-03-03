@@ -6,6 +6,7 @@ from . import bpm_config
 #: 10 mm equals 2**15
 bit_scale = 10/2**15
 
+
 def create_bpm_config():
     '''Beam position monitor as an array of records
 
@@ -27,19 +28,19 @@ def create_bpm_config():
 
     '''
 
-    dtypes = np.dtype({
-        'names'   : ['name', 'x_state', 'y_state',  'ds',      'idx',    'x_scale',  'y_scale', 'x_offset', 'y_offset'],
-        'formats' : ['U20',   np.bool_,  np.bool_,   np.float_, np.int_,  np.float_,  np.float_, np.float_,  np.float_]
-        }
-    )
+    t_names = ['name', 'x_state', 'y_state',  'ds',      'idx']
+    formats = ['U20',   np.bool_,  np.bool_,   np.float_, np.int_]
+    t_names += ['x_scale', 'y_scale', 'x_offset', 'y_offset']
+    formats += [np.float_, np.float_,  np.float_,  np.float_]
+    dtypes = np.dtype({'names':  t_names, 'formats': formats})
 
-    l = len(bpm_config.bpm_conf)
-    data = np.zeros((l,), dtype = dtypes)
+    n_bpms = len(bpm_config.bpm_conf)
+    data = np.zeros((n_bpms,), dtype=dtypes)
     for i in range(l):
         entry = bpm_config.bpm_conf[i]
-        data[i] = entry + (0,0)
+        data[i] = entry + (0, 0)
 
-    del entry, i, l
+    del entry, i, n_bpms
 
     # The scale factors are stored as multipliers ...
     # The BPM class expects them as deviders
@@ -67,7 +68,6 @@ def create_bpm_config():
     assert(sum(reduced_bpms['x_state']) == reduced_bpms.shape[0])
     assert(sum(reduced_bpms['x_state']) == reduced_bpms.shape[0])
 
-
     ds_sort = np.argsort(reduced_bpms['ds'])
     sorted_bpms = np.take(reduced_bpms, ds_sort)
     del ds_sort
@@ -75,14 +75,15 @@ def create_bpm_config():
 
     return sorted_bpms
 
+
 if __name__ == '__main__':
-    l = 10
+    n_bpms = 10
     dtypes = np.dtype({
         'names'   : ['name', 'state_x', 'state_y', 'ds',     'idx',    'x_scale',   'y_scale'],
         'formats' : ['U20',   np.bool_,  np.bool_,  np.float_, np.int_,  np.float_,  np.float_]
         }
     )
-    data = np.array(l, dtype = dtypes)
+    data = np.array(n_bpms, dtype=dtypes)
 
     s_bpm = create_bpm_config()
     idx = s_bpm['idx']
