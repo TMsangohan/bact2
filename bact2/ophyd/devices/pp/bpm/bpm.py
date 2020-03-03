@@ -9,11 +9,11 @@ from ophyd import Component as Cpt, Signal, Device
 from ophyd.status import DeviceStatus, AndStatus
 
 from ...raw import bpm as bpm_raw
-from ...utils.derived_signal import DerivedSignalLinearBPM
+from ...utils.derived_signal import DerivedSignalLinear
 from .bpm_parameters import create_bpm_config
-from .bpm_packed_data import packed_data_to_named_array
+from .bpm_packed_data import (packed_data_to_named_array,
+                              raw_to_scaled_data_channel)
 import numpy as np
-import functools
 import enum
 
 
@@ -40,6 +40,31 @@ class BPMStatusBits(enum.IntEnum):
     #: short form `Live`
     live = 7
 
+
+
+class DerivedSignalLinearBPM( DerivedSignalLinear ):
+    '''BPM raw data to signal
+
+    The inverse is used for calculating the bpm offset
+    in mm from the raw data.
+    '''
+    def forward(self, values):
+        raise NotImplementedError('Can not make a bpm a steerer')
+
+    def inverse(self, values):
+        '''BPM raw to physics coordinates
+
+        BPM data are first scaled from raw data to mm.
+        Then the offset is subtracted.
+        '''
+
+        gain = self._gain.value
+        bit_gain = self._bit_gain.value
+        offset = self._offset.value
+
+        conv = raw_to_scaled_data_channel
+        r  = conv(values, gain, offset, bit_gain=bit_gain)
+        return r
 
 class BPMChannelScale( DerivedSignalLinearBPM ):
     '''Values required for deriving BPM reading from raw signals

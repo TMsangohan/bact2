@@ -78,30 +78,3 @@ class DerivedSignalLinear( DerivedSignal ):
         dval = values - self._offset.value
         r = dval / gain
         return r
-
-
-class DerivedSignalLinearBPM( DerivedSignalLinear ):
-    '''BPM raw data to signal
-
-    The inverse is used for calculating the bpm offset
-    in mm from the raw data.
-    '''
-    def forward(self, values):
-        raise NotImplementedError('Can not make a bpm a steerer')
-
-    def inverse(self, values):
-        '''BPM raw to physics coordinates
-
-        BPM data are first scaled from raw data to mm.
-        Then the offset is subtracted.
-        '''
-        gain = self.getGain()
-        try:
-            scaled = values / gain
-        except Exception:
-            fmt = 'value shape {} gain shape {}'
-            self.log.error(fmt.format(values.shape, gain.shape))
-
-        offset = self._offset.value
-        r = scaled - offset
-        return r
