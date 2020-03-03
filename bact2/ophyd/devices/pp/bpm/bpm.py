@@ -9,42 +9,12 @@ from ophyd import Component as Cpt, Signal, Device
 from ophyd.status import DeviceStatus, AndStatus
 
 from ...raw import bpm as bpm_raw
-from ...utils import process_vector
 from ...utils.derived_signal import DerivedSignalLinearBPM
 from .bpm_parameters import create_bpm_config
-
+from .bpm_packed_data import packed_data_to_named_array
 import numpy as np
 import functools
 import enum
-
-
-def unpack_and_validate_data(packed_data, n_valid_items=None, indices=None):
-    """Split the packed data up to a matrix of bpm waveforms
-
-    Args :
-        packed_data : the data as received by the BPM
-
-    Returns :
-        mat : a matrix with the  different signals as row vectors
-    """
-    mat1 = process_vector.unpack_vector_to_matrix(packed_data, n_vecs=2)
-    with_data = mat1[0, :]
-    unused = mat1[1, :]
-    process_vector.check_unset_elements(unused, n_valid_rows=n_valid_items,
-                                        unset_elements_value=0)
-    del unused
-
-    mat = process_vector.unpack_vector_to_matrix(with_data, n_vecs=8)
-    if indices is not None:
-        mat = np.take(mat, indices, axis=1)
-    for col in mat:
-        # Why does that currently not work ?
-        # process_vector.check_unset_elements(col,
-        #                                    n_valid_rows=self.n_valid_bpms,
-        #                                    unset_elements_value=0)
-        #
-        pass
-    return mat
 
 
 class BPMStatusBits(enum.IntEnum):
@@ -126,7 +96,7 @@ class BPMChannel( Device ):
     rms_raw = Cpt(Signal, name='rms_raw')
 
     #: gains for the channels
-    gain   = Cpt(Signal, name='gain', value=1.0)
+    gain    = Cpt(Signal, name='gain', value=1.0)
 
     #: offset of the BPM from the ideal orbit
     offset = Cpt(Signal, name='offset', value=0.0)
@@ -192,7 +162,7 @@ class BPMWaveform(  bpm_raw.BPMPackedData ):
         self.x.offset.put(rec['x_offset'])
         self.y.offset.put(rec['y_offset'])
 
-    def storeDataInWaveforms(self, mat):
+    def storeDataInWaveforms(self, array):
         """Store row vectors to the appropriate signals
 
         Args:
@@ -200,16 +170,16 @@ class BPMWaveform(  bpm_raw.BPMPackedData ):
         Todo:
             Analyse the status values !
         """
-        stat = mat[4]
 
-        self.x.pos_raw.put(  mat[0])
-        self.y.pos_raw.put(  mat[1])
-        self.intensity_z.put(mat[2])
-        self.intensity_s.put(mat[3])
-        self.status.put(       stat)
-        self.gain_raw.put(   mat[5])
-        self.x.rms_raw.put(  mat[6])
-        self.y.rms_raw.put(  mat[7])
+        self.x.pos_raw.put(array['x_pos_raw'])
+        self.y.pos_raw.put(array['y_pos_raw'])
+        self.x.rms_raw.put(array['x_rms_raw'])
+        self.y.rms_raw.put(array['y_rms_raw'])
+
+        self.intensity_z.put(array['intensity_s'])
+        self.intensity_s.put(array['intensity_z'])
+        self.status.put(array['stat'])
+        self.gain_raw.put(array['gain_raw'])
 
     def checkAndStorePackedData(self, packed_data):
 
@@ -217,10 +187,10 @@ class BPMWaveform(  bpm_raw.BPMPackedData ):
         if len(indices) == 0:
             indices = None
 
-        mat = unpack_and_validate_data(packed_data,
-                                       n_valid_items=self.n_valid_bpms,
-                                       indices=indices)
-        return self.storeDataInWaveforms(mat)
+        array = packed_data_to_named_array(packed_data,
+                                           n_valid_items=self.n_valid_bpms,
+                                           indices=indices)
+        return self.storeDataInWaveforms(array)
 
     def trigger(self):
         status_processed = DeviceStatus(self, timeout=5)
@@ -238,7 +208,6 @@ class BPMWaveform(  bpm_raw.BPMPackedData ):
             data = self.packed_data.get()
             self.checkAndStorePackedData(data)
             status_processed.success = True
-            status_processed.done = True
             status_processed._finished()
 
         status = super().trigger()
