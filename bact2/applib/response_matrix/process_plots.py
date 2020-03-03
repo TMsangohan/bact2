@@ -1,41 +1,12 @@
 '''Model agnostic plots of the measured data
 '''
-from bact2.applib.response_matrix import commons, bpm_plots as bp
-import gzip, pickle, datetime, os, sys, importlib
-
-importlib.reload(bp)
+from bact2.applib.response_matrix.bpm_plots import process_steerer
+from bact2.applib.transverse_lib.process_plots import main_func
 
 
 def main():
-    pickle_file = sys.argv[1]
-    target_file_path = sys.argv[2]
-
-    target_file_name = os.path.basename(target_file_path)
-    plot_dir = os.path.dirname(target_file_path)
-    file_name, ext = os.path.split(target_file_name)
-
-    # preprocess the name
-    tmp = target_file_name.split('_')
-    steerer_name = tmp[2]
-
-    print(f'Processing steerer {steerer_name}')
-
-    start_timestamp = datetime.datetime.now()
-
-    with gzip.open(pickle_file) as fp:
-        obj = pickle.load(fp)
-
-    df = obj.processed_dataframe
-    one_steerer = df.loc[df.sc_selected == steerer_name]
-    preprocess_timestamp = datetime.datetime.now()
-    dtp = preprocess_timestamp - start_timestamp
-
-    bp.process_steerer(one_steerer, plot_dir=plot_dir, 
-                       target_file_name=target_file_name)
-
-    dt = datetime.datetime.now() - start_timestamp
-    print(f'plotting steerer {steerer_name} required {dt}'
-          f' out of that prepocessing required {dtp}')
+    main_func(process_kicker_func=process_steerer,
+              column_with_kicker_name='sc_selected')
 
 
 if __name__ == '__main__':

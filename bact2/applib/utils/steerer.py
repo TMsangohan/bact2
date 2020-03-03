@@ -118,7 +118,7 @@ def add_relative_steps(df, horizontal_current, vertical_current, copy=True):
     return df
 
 
-def add_steerer_info(df, copy = True):
+def add_steerer_info(df, copy=True):
     '''
     '''
     if copy:

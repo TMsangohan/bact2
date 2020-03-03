@@ -1,5 +1,4 @@
-from bact2.applib.response_matrix import reference_orbit
-from . import model_fit_funcs
+from . import reference_orbit, model_fit_funcs
 
 import scipy.optimize
 import numpy as np
@@ -55,7 +54,6 @@ class OrbitOffsetProcessor:
 
         # 1 urad reference angle
         self.reference_angle = 1e-6
-
 
     @functools.lru_cache(maxsize=None)
     def compute_reference_model(self, magnet_name=None, scale=None):

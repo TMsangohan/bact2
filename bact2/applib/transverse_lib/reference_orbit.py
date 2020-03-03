@@ -1,3 +1,9 @@
+'''
+
+Todo:
+   remove dependency on lattice of BESSY II
+'''
+
 from ocelot.cpbd.magnetic_lattice import MagneticLattice
 from ocelot.cpbd.elements import Hcor, Vcor
 from ocelot.cpbd.optics import twiss, Navigator, MethodTM, TransferMap, SecondTM

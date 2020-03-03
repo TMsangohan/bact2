@@ -5,11 +5,10 @@ import logging
 
 logger = logging.getLogger('bact2')
 
-
 def calculated_indep_relative_value(df, indep_column=None, indep_ref_column=None):
     assert(indep_column is not None)
 
-    dI = df.loc[:, indep_column] 
+    dI = df.loc[:, indep_column]
     if indep_ref_column is None:
         return dI
 
@@ -21,8 +20,9 @@ def calculated_indep_relative_value(df, indep_column=None, indep_ref_column=None
         dI = dI - offset
     except Exception:
         txt = (
-            f'indep calculation failed using column {indep_column} for the'
-            f' independent value and {indep_ref_column} for the dependent column'
+            f'indep calculation failed using'
+            f' column {indep_column} for the values'
+            f' and colum {indep_ref_column} as offsets'
             f' indep values {dI}'
         )
         logger.error(txt)
@@ -30,7 +30,8 @@ def calculated_indep_relative_value(df, indep_column=None, indep_ref_column=None
 
     return dI
 
-def calculate_bpm_one_corr(df_sel, coor=None, 
+
+def calculate_bpm_one_corr(df_sel, coor=None,
                            indep_column=None, indep_ref_column=None):
 
     assert(coor is not None)
@@ -49,7 +50,7 @@ def calculate_bpm_one_corr(df_sel, coor=None,
     # Critical for rcond determination
     dI = np.array(dI.values, np.float_)
 
-    # Are sufficient data available? 
+    # Are sufficient data available?
     n_points = dI.shape[0]
 
     m_measurements = bpm.shape[1]
@@ -88,8 +89,8 @@ def calculate_bpm(df_sel, **kws):
     return result
 
 
-def calc_bpm_gains(df, column_name=None, indep_column=None, 
-                    indep_ref_column=None):
+def calc_bpm_gains(df, column_name=None, indep_column=None,
+                   indep_ref_column=None):
     '''
 
     Todo:
@@ -97,7 +98,7 @@ def calc_bpm_gains(df, column_name=None, indep_column=None,
     '''
 
     assert(column_name is not None)
-    # loco script used it already in this manner 
+    # loco script used it already in this manner
     # let's save it for testing
     if column_name is None:
         column_name = 'sc_selected'
@@ -122,7 +123,7 @@ def calc_bpm_gains(df, column_name=None, indep_column=None,
         )
 
         result = calculate_bpm(df_sel, indep_column=indep_column,
-            indep_ref_column=indep_ref_column)
+                               indep_ref_column=indep_ref_column)
         df_ref.loc[key, 'bpm_gx'] = result['x']['gain']
         df_ref.loc[key, 'bpm_gy'] = result['y']['gain']
         df_ref.loc[key, 'bpm_ox'] = result['x']['offset']
@@ -160,7 +161,7 @@ def _calc_bpm_reference_p2(dI, intercept, slope, curve):
     return ref_val
 
 
-def calc_bpm_ref(df, ref, column_name=None, 
+def calc_bpm_ref(df, ref, column_name=None,
                  indep_column=None, indep_ref_column=None):
     '''reference data from fit data
     '''

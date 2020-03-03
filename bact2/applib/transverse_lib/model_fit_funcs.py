@@ -7,7 +7,7 @@ It is assumed that the superfluent computation can be
 ignored. F
 
 '''
-from bact2.applib.response_matrix import reference_orbit
+from . import reference_orbit
 import numpy as np
 import logging
 

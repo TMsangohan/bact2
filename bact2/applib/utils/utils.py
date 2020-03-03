@@ -34,7 +34,7 @@ class Counter:
 
 
 def add_measurement_count_inner(df, grp, counter,
-                          mode_column=None, count_column=None):
+                                mode_column=None, count_column=None):
     '''
 
     Todo:
@@ -80,7 +80,7 @@ def add_measurement_counts_progressive_slow(df, columns=None, count_column=None,
         row_sel = df.loc[idx, columns]
         indicator_for_change = tuple(row_sel.values)
         val = counter(indicator_for_change)
-        df.loc[idx, count_column] = val 
+        df.loc[idx, count_column] = val
         txt = (
             f'progressive counting columns {columns}:'
             f' index: {idx} counter {val}'
@@ -180,7 +180,7 @@ def count_measurements_broken(df, columns):
     return flags
 
 
-def add_measurement_counts(df, columns=None, count_column='measurement', 
+def add_measurement_counts(df, columns=None, count_column='measurement',
                             copy=True):
     '''
 
