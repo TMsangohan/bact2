@@ -4,6 +4,7 @@ import scipy.optimize
 import numpy as np
 import functools
 import logging
+import enum
 
 logger = logging.getLogger('bact2')
 
@@ -55,7 +56,7 @@ class OrbitOffsetProcessor:
         # 1 urad reference angle
         self.reference_angle = 1e-6
 
-    @functools.lru_cache(maxsize=None)
+    # @functools.lru_cache(maxsize=None)
     def compute_reference_model(self, magnet_name=None, scale=None):
 
         assert(magnet_name is not None)
@@ -73,14 +74,25 @@ class OrbitOffsetProcessor:
 
         return offset
 
-    def _compute(self, magnet_name, scale):
-        r = self.compute_reference_model(scale=scale, magnet_name=magnet_name)
+    def _compute(self, magnet_name=None, scale=None, **kws):
+        r = self.compute_reference_model(scale=scale, magnet_name=magnet_name,
+                                         **kws)
         dx = r.bpm.x
         dy = r.bpm.y
+
+        ox = dx.max()
+        oy = dy.max()
+
+        logger.debug(f'_compute: offset max dx {ox} dy {oy}')
 
         model_to_bpm = 1/bpm_scale_factor
         dxs = dx * model_to_bpm
         dys = dy * model_to_bpm
+
+        ox = dxs.max()
+        oy = dys.max()
+        logger.debug(f'_compute: offset scaled max dxs {ox} dys {oy}')
+
         r = reference_orbit.OrbitData(x=dxs, y=dys, s=r.bpm.s)
         return r
 
@@ -92,34 +104,50 @@ class OrbitOffsetProcessor:
         )
         return data
 
-    def create_model_data(self, magnet_name=None, scales=None):
+    def create_model_data(self, magnet_name=None, scales=None,
+                          scale_model_data=True, **kws):
         '''
 
         model data are all rescaled to scale 1
         '''
         def scaled_to_1(scale):
-            data = self._compute(magnet_name, scale)
-            xs = data.x/scale
-            ys = data.y/scale
+            data = self._compute(magnet_name=magnet_name, scale=scale, **kws)
+            xs = data.x
+            ys = data.y
+            if scale_model_data:
+                assert(0)
+                xs = xs/scale
+                ys = ys/scale
+
+            ox = xs.max()
+            oy = ys.max()
+            logger.debug(f'scaled to 1: offset scaled max {ox} {oy}')
+
             r = reference_orbit.OrbitData(x=xs, y=ys, s=data.s)
             return r
 
         data = [scaled_to_1(scale) for scale in scales]
         return self._combine_data(data)
 
-    def create_reference_data(self, magnet_name=None, scales=None):
+    def create_reference_data(self, magnet_name=None, scales=None, **kws):
         '''
         '''
         data = [
-            self._compute(magnet_name, scale) for scale in scales
+            self._compute(magnet_name, scale, **kws) for scale in scales
         ]
         return self._combine_data(data)
 
 
+class StepsModelFit(enum.IntEnum):
+    '''How
+    '''
+    estimate_scale = 1
+    all_steps = 10
+
+
 def calculate_model_fits(orbit_processor=None, bpm_data=None,
-                         magnet_name=None,
-                         steerer_amplitude=None,
-                         coordinate=None, last_2D=True):
+                         magnet_name=None, steerer_amplitude=None,
+                         coordinate=None, last_2D=True, steps_to_execute=None):
     '''Fit ocelot model to bpm data.
 
     This is done stepwise. It could be that a straight forwared fit
@@ -141,6 +169,11 @@ def calculate_model_fits(orbit_processor=None, bpm_data=None,
     assert(orbit_processor is not None)
     assert(bpm_data is not None)
 
+    if steps_to_execute is None:
+        steps_to_execute = StepsModelFit.all_steps
+    else:
+        steps_to_execute = StepsModelFit(steps_to_execute)
+
     steerer_amplitude = np.atleast_1d(steerer_amplitude)
     if len(steerer_amplitude.shape) != 1:
         raise AssertionError('steerer amplitude can only be a vector')
@@ -160,10 +193,15 @@ def calculate_model_fits(orbit_processor=None, bpm_data=None,
     res_guess = scipy.optimize.least_squares(func, x0=(1,), jac=jac, kwargs=d)
     x0 = float(res_guess.x)
 
-    logger.info(
+    txt = (
         f'Magnet {magnet_name} Linear approximation scaling x={x0}'
         f' status={res_guess.status}'
     )
+    logger.info(txt)
+
+    if steps_to_execute <= StepsModelFit.estimate_scale:
+        res_guess.x = (0, x0, 0)
+        return x0, res_guess
 
     scaled_amplitude = steerer_amplitude * x0
     # Now parabolic fit to the data
