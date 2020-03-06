@@ -40,6 +40,7 @@ def prepare_bpm_data(df_sel, ref_row=0):
 
 
 def plot_fit_data_one_coordinate(ref_data=None, bpm_data=None, bpm_data_m=None,
+                                 offset=None,
                                  ds=None, ds_bpm=None, axes=None, lines_scale=None):
     '''
     Args:
@@ -47,6 +48,9 @@ def plot_fit_data_one_coordinate(ref_data=None, bpm_data=None, bpm_data_m=None,
                     close to one line. Thus its much easier to see if the
                     excitation exhibits not linear content
     '''
+
+    if offset is None:
+        offset = 0.0
 
     ax1, ax2, ax3 = axes
 
@@ -75,7 +79,8 @@ def plot_fit_data_one_coordinate(ref_data=None, bpm_data=None, bpm_data_m=None,
         # A line helping the eye
         dx_row = bpm_data[row, :]
         dx_m_row = bpm_data_m[row, :]
-        dx_ref_row = ref_data[row, :]
+
+        dx_ref_row = ref_data[row, :] #- offset
 
         pdx_row = dx_row * this_line_scale
         pdx_m_row = dx_m_row * this_line_scale
@@ -88,11 +93,11 @@ def plot_fit_data_one_coordinate(ref_data=None, bpm_data=None, bpm_data_m=None,
                  linewidth=.25)
 
         # The fitted ones
-        ax1.plot(ds,   pdx_ref_row, '+-', color=lcol, linewidth=.25)
+        ax1.plot(ds,   pdx_ref_row, '-', color=lcol, linewidth=.25)
 
         # Plotting the offset from the fit to all other data
-        offset = dx_m_row - dx_ref_row
-        poffset = offset * this_line_scale
+        data_offset = dx_m_row - dx_ref_row
+        poffset = data_offset * this_line_scale
         # offset = pdx_ref_row
 
         ax2.plot(ds, poffset, '+-', color=lcol, linewidth=.25)
@@ -102,16 +107,22 @@ def plot_fit_data_one_coordinate(ref_data=None, bpm_data=None, bpm_data_m=None,
         bpm_min_measurement = 0.05
         idx = np.absolute(pdx_m_row) > bpm_min_measurement
 
-        offset_sel = offset[idx]
+        data_offset_sel = data_offset[idx]
         ds_sel = ds[idx]
         dx_ref_row_sel = dx_ref_row[idx]
-        scale = offset_sel / dx_ref_row_sel
-        pscale = scale #* this_line_scale
+        scale = data_offset_sel / dx_ref_row_sel
+        pscale = scale # * this_line_scale
         ax3.plot(ds_sel, pscale, '.--', color=lcol, linewidth=.25)
 
 
-def plot_fit_data(ref_data=None, bpm_data=None, bpm_data_m=None,
+def plot_fit_data(ref_data=None, bpm_data=None, bpm_data_m=None, offset=None,
                   savename=None, lines_scale=None):
+
+    # Offsets only in x and y
+    if offset is None:
+        offset = (0.0, ) * 2
+
+    offset_x, offset_y = offset
 
     fig = plt.figure(figsize=[16, 20])
     ax1_x = plt.subplot(321)
@@ -127,8 +138,10 @@ def plot_fit_data(ref_data=None, bpm_data=None, bpm_data_m=None,
 
         if coor == 'x':
             axes = axes_x
+            t_offset = offset_x
         elif coor == 'y':
             axes = axes_y
+            t_offset = offset_y
 
         for ax in axes:
             ax.clear()
@@ -139,6 +152,7 @@ def plot_fit_data(ref_data=None, bpm_data=None, bpm_data_m=None,
 
         plot_fit_data_one_coordinate(ref_data=rd, bpm_data=bd,
                                      bpm_data_m=bdm, ds=ref_data.s,
+                                     offset=t_offset,
                                      ds_bpm=bpm_data.s[0],
                                      axes=axes,
                                      lines_scale=lines_scale)
@@ -161,53 +175,7 @@ def plot_fit_data(ref_data=None, bpm_data=None, bpm_data_m=None,
     fig.savefig(savename)
 
 
-def process_steerer(df, steerer_ps_name, coordinate=None, savename=None,
-                    last_2D=True):
-
-    ps2magnet = model_fits.steerer_power_converter_to_steerer_magnet
-    steerer_name = ps2magnet(steerer_ps_name)
-
-    df_sel = df.loc[(df.sc_selected == steerer_ps_name), :]
-    bpm_data, bpm_data_m = prepare_bpm_data(df_sel)
-
-    dI = df_sel.bk_dev_dI
-    dI_max = dI.abs().max()
-    dI_s = dI/dI_max
-
-    op = model_fits.OrbitOffsetProcessor()
-    op.reference_angle = 5e-5
-
-    calc = model_fits.calculate_model_fits
-    r = calc(orbit_processor=op, bpm_data=bpm_data_m,
-             magnet_name=steerer_name, coordinate=coordinate,
-             steerer_amplitude=dI_s, last_2D=last_2D)
-    scale, res2D = r
-
-    scaled_amplitude = model_fit_funcs.compute_scaling(dI_s, *res2D.x)
-    logger.debug(f'Using following amplitudes for plot {scaled_amplitude}')
-    ref_data = op.create_reference_data(magnet_name=steerer_name,
-                                        scales=scaled_amplitude)
-
-    # The standard fit plots
-    plot_fit_data(ref_data=ref_data, bpm_data=bpm_data, bpm_data_m=bpm_data_m,
-                  savename=savename)
-
-    dI_sa = np.absolute(dI_s)
-    _eps = 1e-6
-
-    # Which scale to use for data without a scale
-    lines_scale = np.where(dI_sa < _eps, None, 1/dI_s)
-
-    # The  fit plots  with all data scaled to approximately one
-    name, ext = os.path.splitext(savename)
-    scaled_name = name + '_scaled' + ext
-
-    # The scaled fit plots
-    plot_fit_data(ref_data=ref_data, bpm_data=bpm_data, bpm_data_m=bpm_data_m,
-                  savename=scaled_name, lines_scale=lines_scale)
-
-
-def main_func():
+def main_func(process_func):
     pickle_file_name = sys.argv[1]
     target_file_path = sys.argv[2]
 
@@ -215,7 +183,7 @@ def main_func():
     file_name, ext = os.path.splitext(target_file_name)
 
     # preprocess the name
-    plot_prefix, cnt, steerer_name, suffix, coordinate = file_name.split('_')
+    plot_prefix, cnt, kicker_name, suffix, coordinate = file_name.split('_')
 
     n_dims = suffix
     if n_dims == '1d':
@@ -230,14 +198,12 @@ def main_func():
         raise AssertionError(txt)
 
     logger.info(
-        f'Processing steerer {steerer_name} main coordinate {coordinate}'
+        f'Processing kicker {kicker_name} main coordinate {coordinate}'
     )
-
-    ps_name = steerer_name
 
     with gzip.open(pickle_file_name) as fp:
         obj = pickle.load(fp)
 
     df = obj.processed_dataframe
-    process_steerer(df, ps_name, coordinate=coordinate,
-                    savename=target_file_path, last_2D=last_2D)
+    process_func(df, kicker_name, coordinate=coordinate,
+                 savename=target_file_path, last_2D=last_2D)
