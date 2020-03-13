@@ -1,3 +1,9 @@
+'''
+
+Todo:
+   remove dependency on lattice of BESSY II
+'''
+
 from ocelot.cpbd.magnetic_lattice import MagneticLattice
 from ocelot.cpbd.elements import Hcor, Vcor
 from ocelot.cpbd.optics import twiss, Navigator, MethodTM, TransferMap, SecondTM
@@ -191,6 +197,49 @@ class OrbitCalculator:
 
         ins = self.__class__(new_cell, copy=False, init_lattice=init_lattice)
         return new_element, ins
+
+    def orbitCalculatorForChangedQuadrupole(self, name=None, rk1=None,
+                                            dx=None, dy=None, init_lattice=True):
+        '''
+        '''
+
+        if rk1 is not None:
+            rk1 = float(rk1)
+            drk1 = abs(rk1)
+            # Debug purpose: do not allow a quadrupole change by more than 10 %
+            max_scale = .1
+            if drk1 > max_scale:
+                txt = (
+                    f'Requested relative scale'
+                    f' for k1 {rk1} is more than {max_scale}.'
+                    f' Interal parameters drk1 {drk1}'
+                )
+                raise AssertionError(txt)
+
+            assert(abs(drk1) < .1)
+
+        r = self.orbitCalculatorWithNewElement(name, init_lattice=False)
+        new_element, new_orbit = r
+
+        if rk1 is not None:
+            # Apply k for quadruole
+            k1 = new_element.k1
+            nk1 = k1 * (1 + rk1)
+            new_element.k1 = nk1
+
+        # Apply offset
+        if dx is not None:
+            dx = float(dx)
+            new_element.dx = dx
+
+        if dy is not None:
+            dy = float(dy)
+            new_element.dy = dy
+
+        log.info(f'Created new lattice with relative k1 change {rk1} dx {dx} dy  {dy}')
+        if init_lattice:
+            new_orbit.initLattice()
+        return new_orbit
 
     def orbitCalculatorForChangedMagnet(self, name=None, angle=None,
                                         init_lattice=True):

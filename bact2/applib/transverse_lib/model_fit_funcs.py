@@ -7,7 +7,7 @@ It is assumed that the superfluent computation can be
 ignored. F
 
 '''
-from bact2.applib.response_matrix import reference_orbit
+from . import reference_orbit
 import numpy as np
 import logging
 
@@ -59,12 +59,14 @@ def compute_reference_data(params, simple=True, dI=None, model_data=None):
 
 def min_single_coordinate(params, *args, bpm_data=None, coordinate=None, **kws):
 
+
     assert(bpm_data is not None)
     assert(coordinate is not None)
 
     ref_o = compute_reference_data(params, *args, **kws)
     ref = getattr(ref_o, coordinate)
     measurement = getattr(bpm_data, coordinate)
+
     dval = measurement - ref
     dval = np.ravel(dval)
 
@@ -114,18 +116,3 @@ def jac_single_coordinate(params, *args, simple=True, dI=None, coordinate=None,
     # measurement data - model
     jac = -jac
     return jac
-
-
-def min_func_adjust_2D(params, *args, bpm_data=None, **kws):
-    '''Minimize the radial offset
-    '''
-    assert(bpm_data is not None)
-
-    ref = compute_reference_data(params, *args, **kws)
-    dval_x = bpm_data.x - ref.x
-    dval_y = bpm_data.y - ref.y
-
-    dval2 = dval_x**2 + dval_y**2
-    dval = np.sqrt(dval2)
-    dval = np.ravel(dval)
-    return dval
