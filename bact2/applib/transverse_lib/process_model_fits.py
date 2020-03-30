@@ -22,8 +22,12 @@ def prepare_bpm_data(df_sel, ref_row=0):
     x = df_sel.bpm_waveform_x_pos
     y = df_sel.bpm_waveform_y_pos
 
+    x = np.array(x.tolist(), np.float_)
+    y = np.array(y.tolist(), np.float_)
+
     ds = df_sel.bpm_waveform_ds
 
+    logger.warning(f'x0.shape {x0.shape}, x.shape {x.shape}')
     dx = x - x0
     dy = y - y0
 
