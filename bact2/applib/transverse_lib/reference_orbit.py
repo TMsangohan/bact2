@@ -24,8 +24,12 @@ import copy as _copy
 
 # from ocelot.gui.accelerator import plot_opt_func, plot_API
 
-
-bessy_ii_path = '/home/mfp/Devel/bessy_ii/'
+bessy_ii_path = os.path.normpath(
+    os.path.join(
+        os.path.dirname(__file__),
+        *([os.path.pardir] * 4 + ['bessy_ii'])
+    )
+)
 
 if bessy_ii_path not in sys.path:
     sys.path.append(bessy_ii_path)
