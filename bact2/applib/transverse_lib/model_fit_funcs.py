@@ -59,7 +59,6 @@ def compute_reference_data(params, simple=True, dI=None, model_data=None):
 
 def min_single_coordinate(params, *args, bpm_data=None, coordinate=None, **kws):
 
-
     assert(bpm_data is not None)
     assert(coordinate is not None)
 
@@ -116,3 +115,18 @@ def jac_single_coordinate(params, *args, simple=True, dI=None, coordinate=None,
     # measurement data - model
     jac = -jac
     return jac
+
+
+def min_func_adjust_2D(params, *args, bpm_data=None, **kws):
+    '''Minimize the radial offset
+    '''
+    assert(bpm_data is not None)
+
+    ref = compute_reference_data(params, *args, **kws)
+    dval_x = bpm_data.x - ref.x
+    dval_y = bpm_data.y - ref.y
+
+    dval2 = dval_x**2 + dval_y**2
+    dval = np.sqrt(dval2)
+    dval = np.ravel(dval)
+    return dval

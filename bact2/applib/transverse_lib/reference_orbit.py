@@ -78,6 +78,7 @@ class OrbitCalculator:
         self.orb = None
         self.method = None
         self.lat_od = None
+        self.lat = None
 
         # Lookup for the element
         self.lat_od = collections.OrderedDict()
@@ -107,6 +108,7 @@ class OrbitCalculator:
 
         self.orb = orb
         self.method = method
+        self.lat = lat
 
     @functools.lru_cache(maxsize=2)
     def getBPMDs(self):
@@ -136,6 +138,21 @@ class OrbitCalculator:
         d = OrbitBpmTrace(bpm=bpm, trace=trace)
 
         return d
+
+    def twissParameters(self):
+        assert(self.lat is not None)
+        tws = twiss(self.lat, tws0=None)
+        return tws
+
+    def twissParametersBpms(self):
+        bpm_ids = [p.id for p in self.orb.bpms]
+        twiss = self.twissParameters()
+
+        r = []
+        for tws in twiss:
+            if tws.id in bpm_ids:
+                r.append(tws)
+        return r
 
     def storeReferenceOrbit(self):
         return self._orbitData(write2bpms=True)
@@ -202,6 +219,7 @@ class OrbitCalculator:
                                             dx=None, dy=None, init_lattice=True):
         '''
         '''
+        from ocelot.cpbd.elements import XYQuadrupole
 
         if rk1 is not None:
             rk1 = float(rk1)
@@ -228,13 +246,17 @@ class OrbitCalculator:
             new_element.k1 = nk1
 
         # Apply offset
+        assert(isinstance(new_element, XYQuadrupole))
+
         if dx is not None:
             dx = float(dx)
             new_element.dx = dx
+            new_element.x_offs = dx
 
         if dy is not None:
             dy = float(dy)
             new_element.dy = dy
+            new_element.y_offs = dy
 
         log.info(f'Created new lattice with relative k1 change {rk1} dx {dx} dy  {dy}')
         if init_lattice:

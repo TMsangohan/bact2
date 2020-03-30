@@ -1,4 +1,4 @@
-from . import reference_orbit, model_fit_funcs
+from . import reference_orbit, model_fit_funcs, magnet_info
 
 import scipy.optimize
 import numpy as np
@@ -10,18 +10,6 @@ logger = logging.getLogger('bact2')
 
 #: scaling factor of bpm data: these are in mm
 bpm_scale_factor = 1./1000.
-
-
-def steerer_power_converter_to_steerer_magnet(name):
-    '''
-
-    Todo:
-        add thorough checks!
-    '''
-    index = 3
-    assert(name[index] == 'p')
-    magnet_name = name[:index] + 'm' + name[index+1:]
-    return magnet_name.upper()
 
 
 def select_bpm_data_in_model(ds, dx, dy):
@@ -42,8 +30,8 @@ def select_bpm_data_in_model(ds, dx, dy):
 
 
 class OrbitOffsetProcessor:
-    def __init__(self):
-        orbit = reference_orbit.OrbitCalculator()
+    def __init__(self, **kws):
+        orbit = reference_orbit.OrbitCalculator(**kws)
 
         orbit_data_ref = orbit.orbitData()
         orbit_offset_filter = reference_orbit.OrbitOffset()
@@ -56,7 +44,7 @@ class OrbitOffsetProcessor:
         # 1 urad reference angle
         self.reference_angle = 1e-6
 
-    # @functools.lru_cache(maxsize=None)
+    @functools.lru_cache(maxsize=None)
     def compute_reference_model(self, magnet_name=None, scale=None):
 
         assert(magnet_name is not None)
@@ -74,7 +62,8 @@ class OrbitOffsetProcessor:
 
         return offset
 
-    def _compute(self, magnet_name=None, scale=None, **kws):
+    def _compute(self, magnet_name=None, scale=None, scale_to_bpm_units=False,
+                 **kws):
         r = self.compute_reference_model(scale=scale, magnet_name=magnet_name,
                                          **kws)
         dx = r.bpm.x
@@ -85,13 +74,21 @@ class OrbitOffsetProcessor:
 
         logger.debug(f'_compute: offset max dx {ox} dy {oy}')
 
-        model_to_bpm = 1/bpm_scale_factor
-        dxs = dx * model_to_bpm
-        dys = dy * model_to_bpm
+        if not scale_to_bpm_units:
+            dxs, dys = dx, dy
+        else:
+            model_to_bpm = 1/bpm_scale_factor
+            txt = (
+                'Scaling model data to bpm units:'
+                f' scaling factor = {model_to_bpm}!'
+            )
+            logger.warning(txt)
+            dxs = dx * model_to_bpm
+            dys = dy * model_to_bpm
 
-        ox = dxs.max()
-        oy = dys.max()
-        logger.debug(f'_compute: offset scaled max dxs {ox} dys {oy}')
+            ox = dxs.max()
+            oy = dys.max()
+            logger.debug(f'_compute: offset scaled max dxs {ox} dys {oy}')
 
         r = reference_orbit.OrbitData(x=dxs, y=dys, s=r.bpm.s)
         return r
@@ -115,7 +112,6 @@ class OrbitOffsetProcessor:
             xs = data.x
             ys = data.y
             if scale_model_data:
-                assert(0)
                 xs = xs/scale
                 ys = ys/scale
 
@@ -142,6 +138,7 @@ class StepsModelFit(enum.IntEnum):
     '''How
     '''
     estimate_scale = 1
+    fit_parabola = 2
     all_steps = 10
 
 
@@ -180,18 +177,23 @@ def calculate_model_fits(orbit_processor=None, bpm_data=None,
 
     # First step linear scaling
     t_max = steerer_amplitude.max()
-    model_data = orbit_processor.create_model_data(magnet_name, [t_max])
+    model_data = orbit_processor.create_model_data(magnet_name, [t_max],
+                                                   scale_to_bpm_units=False)
 
-    d = {
-        'model_data': model_data, 'dI': steerer_amplitude, 'simple': True,
-        'bpm_data': bpm_data,
-        'coordinate': coordinate,
-    }
+    ref_data = model_fit_funcs.compute_reference_data([1], simple=True,
+                                                      dI=steerer_amplitude,
+                                                      model_data=model_data)
 
-    func = model_fit_funcs.min_single_coordinate
-    jac = model_fit_funcs.jac_single_coordinate
-    res_guess = scipy.optimize.least_squares(func, x0=(1,), jac=jac, kwargs=d)
-    x0 = float(res_guess.x)
+    t_bpm_data = getattr(bpm_data, coordinate)
+    t_ref_data = getattr(ref_data, coordinate)
+
+    t_ref = t_ref_data.ravel()[:, np.newaxis]
+    t_bpm = t_bpm_data.ravel()
+    t_bpm = t_bpm * bpm_scale_factor
+
+    res_guess = scipy.optimize.lsq_linear(t_ref, t_bpm)
+    assert(res_guess.success)
+    x0 = res_guess.x
 
     txt = (
         f'Magnet {magnet_name} Linear approximation scaling x={x0}'
@@ -203,48 +205,79 @@ def calculate_model_fits(orbit_processor=None, bpm_data=None,
         res_guess.x = (0, x0, 0)
         return x0, res_guess
 
-    scaled_amplitude = steerer_amplitude * x0
-    # Now parabolic fit to the data
-    d['simple'] = False
-    d['dI'] = scaled_amplitude
+    d = {
+        'model_data': model_data, 'dI': steerer_amplitude, 'simple': False,
+        'bpm_data': bpm_data, 'coordinate': coordinate,
+    }
+    jac = model_fit_funcs.jac_single_coordinate
+    t_ref = - jac([1, 1, 1], **d)
 
-    res_fit = scipy.optimize.least_squares(func, x0=(0, 1, 0), jac=jac,
-                                           kwargs=d)
+    res_fit = scipy.optimize.lsq_linear(t_ref, t_bpm)
+    assert(res_fit.success)
 
     logger.info(
         f'Magnet {magnet_name} Parabolic approximation scaling x={res_fit.x}'
         f' status={res_fit.status}'
     )
 
+    # As I use linear fits now I do not see the point in using scaled fits
+    # Fur
+    # Create fit matrix ...
+    # scaled_amplitude = steerer_amplitude * x0
+
+    # # Now scale the parameters by the scale factor
+    # t_par = np.array(res_fit.x) * x0
+
+    # I guess this time its good enough to go for the full fit to the
+    # 2D data
+    if steps_to_execute <= StepsModelFit.fit_parabola:
+        return res_fit.x, res_fit
+
     # Now parabolic fit to the data but with model data for each
     # excitation
     compute_scaling = model_fit_funcs.compute_scaling
-    t_par = np.array(res_fit.x) * x0
     logger.info(
         f'Magnet {magnet_name} recomputing reference data using pars {t_par}'
         f' scaling={x0}'
     )
 
-    # I guess this time its good enough to go for the full fit to the
-    # 2D data
-
     del d['coordinate']
+
+    func = model_fit_funcs.min_single_coordinate
+    jac_sc = model_fit_funcs.jac_single_coordinate
 
     if last_2D:
         func = model_fit_funcs.min_func_adjust_2D
         jac = None
         info = 'x and y simultaneously'
-
     else:
         func = model_fit_funcs.min_single_coordinate
-        jac = model_fit_funcs.jac_single_coordinate
+        jac = jac_sc
         d['coordinate'] = coordinate
         info = f'coordinate {coordinate}'
 
     for i in range(2):
         scaled_amplitude = compute_scaling(steerer_amplitude, *t_par)
         model_data = orbit_processor.create_model_data(magnet_name=magnet_name,
-                                                       scales=scaled_amplitude)
+                                                       scales=scaled_amplitude,
+                                                       scale_to_bpm_units=False,
+                                                       scale_model_data=False)
+        d['dI'] = scaled_amplitude
+        if last_2D:
+            t_ref_x = - jac_sc([1, 1, 1], coordinate='x', **d)
+            t_ref_y = - jac_sc([1, 1, 1], coordinate='y', **d)
+            t_ref = np.concatenate([t_ref_x, t_ref_y], axis=0)
+            t_bpm_all = np.concatenate([bpm_data.x.ravel(), bpm_data.y.ravel()],
+                                       axis=0)
+        else:
+            t_ref = - jac_sc([1, 1, 1], **d)
+            t_bpm_all = getattr(bpm_data, coordinate).ravel()
+
+        t_bpm_all = t_bpm_all * bpm_scale_factor
+        res2D = scipy.optimize.lsq_linear(t_ref, t_bpm_all)
+        assert(res_fit.success)
+        t_par = res2D.x
+        continue
 
         d['model_data'] = model_data
         d['dI'] = steerer_amplitude
@@ -252,6 +285,9 @@ def calculate_model_fits(orbit_processor=None, bpm_data=None,
             f'Using scaled amplitudes {scaled_amplitude}'
         )
 
+        model_data = orbit_processor.create_model_data(magnet_name=magnet_name,
+                                                       scales=scaled_amplitude,
+                                                       scale_to_bpm_units=False)
         res2D = scipy.optimize.least_squares(func, x0=t_par, kwargs=d)
         t_par = res2D.x
 

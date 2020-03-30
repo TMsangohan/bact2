@@ -40,8 +40,9 @@ def prepare_bpm_data(df_sel, ref_row=0):
 
 
 def plot_fit_data_one_coordinate(ref_data=None, bpm_data=None, bpm_data_m=None,
-                                 offset=None,
-                                 ds=None, ds_bpm=None, axes=None, lines_scale=None):
+                                 offset=None, scale_model_data=None,
+                                 ds=None, ds_bpm=None, axes=None,
+                                 line_colors=None, lines_scale=None):
     '''
     Args:
        lines_scale: scale each individal line. Typically used to get all plots
@@ -51,6 +52,13 @@ def plot_fit_data_one_coordinate(ref_data=None, bpm_data=None, bpm_data_m=None,
 
     if offset is None:
         offset = 0.0
+
+    if scale_model_data is None:
+        # Scale from model m to mm
+        scale_model_data = 1000.0
+
+    scale_model_data = float(scale_model_data)
+    logger.info(f'Scaling model data by {scale_model_data}')
 
     ax1, ax2, ax3 = axes
 
@@ -80,20 +88,38 @@ def plot_fit_data_one_coordinate(ref_data=None, bpm_data=None, bpm_data_m=None,
         dx_row = bpm_data[row, :]
         dx_m_row = bpm_data_m[row, :]
 
-        dx_ref_row = ref_data[row, :] #- offset
+        # Model data are typically in meter while bpm data are in mm
+        dx_ref_row = ref_data[row, :] * scale_model_data #- offset
 
+        # For scaled plots
         pdx_row = dx_row * this_line_scale
         pdx_m_row = dx_m_row * this_line_scale
         pdx_ref_row = dx_ref_row * this_line_scale
 
+        pdx_ref_row = pdx_ref_row
+
         # The measured data
-        line, = ax1.plot(ds_bpm, pdx_row, marker=marker)
+        if line_colors is not None:
+            t_color = line_colors[row]
+        else:
+            t_color = None
+
+        # The measured bpm data
+        line, = ax1.plot(ds_bpm, pdx_row, marker, color=t_color)
         lcol = line.get_color()
-        ax1.plot(ds_bpm, pdx_row, linestyle=linestyle, color=lcol,
-                 linewidth=.25)
+
+
+        # The measured bpm data line ... all measurements
+        # ax1.plot(ds_bpm, pdx_row, linestyle=linestyle, color=lcol, linewidth=.1)
+        #
+        # The measured bpm data used for the fit: there is a bpm missing in the
+        # model
+        ax1.plot(ds_bpm, pdx_row, '.',
+                 linestyle=linestyle,
+                 color=lcol, linewidth=.1)
 
         # The fitted ones
-        ax1.plot(ds,   pdx_ref_row, '-', color=lcol, linewidth=.25)
+        ax1.plot(ds,   pdx_ref_row, '-+', color=lcol, linewidth=.25)
 
         # Plotting the offset from the fit to all other data
         data_offset = dx_m_row - dx_ref_row
@@ -105,7 +131,9 @@ def plot_fit_data_one_coordinate(ref_data=None, bpm_data=None, bpm_data_m=None,
         # relative difference only if significant measurement data
         # currently for bpm measurements above 0.05 mm
         bpm_min_measurement = 0.05
-        idx = np.absolute(pdx_m_row) > bpm_min_measurement
+        idx = (
+            np.absolute(pdx_ref_row) > bpm_min_measurement
+        )
 
         data_offset_sel = data_offset[idx]
         ds_sel = ds[idx]
@@ -116,7 +144,8 @@ def plot_fit_data_one_coordinate(ref_data=None, bpm_data=None, bpm_data_m=None,
 
 
 def plot_fit_data(ref_data=None, bpm_data=None, bpm_data_m=None, offset=None,
-                  savename=None, lines_scale=None):
+                  scale_model_data=None, lines_scale=None, line_colors=None,
+                  title=None, savename=None):
 
     # Offsets only in x and y
     if offset is None:
@@ -150,11 +179,12 @@ def plot_fit_data(ref_data=None, bpm_data=None, bpm_data_m=None, offset=None,
         bd = getattr(bpm_data, coor)
         bdm = getattr(bpm_data_m, coor)
 
-        plot_fit_data_one_coordinate(ref_data=rd, bpm_data=bd,
-                                     bpm_data_m=bdm, ds=ref_data.s,
+        plot_fit_data_one_coordinate(ref_data=rd, bpm_data=bd, bpm_data_m=bdm,
+                                     ds=ref_data.s, ds_bpm=bpm_data.s[0],
+                                     scale_model_data=scale_model_data,
                                      offset=t_offset,
-                                     ds_bpm=bpm_data.s[0],
                                      axes=axes,
+                                     line_colors=line_colors,
                                      lines_scale=lines_scale)
 
         ax1, ax2, ax3 = axes
@@ -164,13 +194,15 @@ def plot_fit_data(ref_data=None, bpm_data=None, bpm_data_m=None, offset=None,
 
         if coor == 'x':
             ax1.set_ylabel('x [mm]')
-            ax2.set_ylabel('$\Delta$ x [mm]')
+            ax2.set_ylabel(r'$\Delta$ x [mm]')
             ax3.set_ylabel('rx')
         elif coor == 'y':
             ax1.set_ylabel('y [mm]')
-            ax2.set_ylabel('$\Delta$ y [mm]')
+            ax2.set_ylabel(r'$\Delta$ y [mm]')
             ax3.set_ylabel('ry')
 
+    if title is not None:
+        ax1.set_title(title)
     fig.set_tight_layout(True)
     fig.savefig(savename)
 
@@ -179,6 +211,7 @@ def main_func(process_func):
     pickle_file_name = sys.argv[1]
     target_file_path = sys.argv[2]
 
+    dir_name = os.path.dirname(target_file_path)
     target_file_name = os.path.basename(target_file_path)
     file_name, ext = os.path.splitext(target_file_name)
 
@@ -205,5 +238,13 @@ def main_func(process_func):
         obj = pickle.load(fp)
 
     df = obj.processed_dataframe
-    process_func(df, kicker_name, coordinate=coordinate,
-                 savename=target_file_path, last_2D=last_2D)
+
+    for t_coordinate in ['x', 'y']:
+        if t_coordinate != coordinate:
+            savename = target_file_name.replace(coordinate, t_coordinate)
+        else:
+            savename = target_file_name
+
+        savepath = os.path.join(dir_name, savename)
+        process_func(df, kicker_name, coordinate=t_coordinate,
+                     savename=savepath, last_2D=last_2D)
