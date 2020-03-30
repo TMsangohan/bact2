@@ -16,6 +16,7 @@ from ocelot.cpbd.beam import ParticleArray, Particle, Beam, Twiss
 import collections
 import functools
 import numpy as np
+import os.path
 import sys
 import logging
 
