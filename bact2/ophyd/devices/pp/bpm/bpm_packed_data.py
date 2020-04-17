@@ -15,6 +15,9 @@ def unpack_and_validate_data(packed_data, n_valid_items=None, indices=None):
     See :func:`packed_data_to_named_array` for convenient procecssing of packed
     data to named array
     """
+    
+    assert(n_valid_items is not None)
+    
     mat1 = process_vector.unpack_vector_to_matrix(packed_data, n_vecs=2)
     with_data = mat1[0, :]
     unused = mat1[1, :]
