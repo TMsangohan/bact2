@@ -26,6 +26,19 @@ def create_bpm_config():
         * `x_offset`: offset in x axis
         * `y_offset`: offset in y axis
 
+    Todo:
+       Discuss how x_scale and y_scale should be handled.
+
+       Rationale: bluesky/ophyd considers the transformation from raw data to
+                  physics data as an inverse operation. Thus standard operation
+                  would be for the forward operation:
+
+                  ..math::
+
+                       raw_value = scale $\cdot$ physics_value + offset
+
+                  BESSY II standard approach is to use the equation above as
+                  a mapping from raw_value to physics_value.
     '''
 
     t_names = ['name', 'x_state', 'y_state',  'ds',      'idx']
@@ -38,7 +51,8 @@ def create_bpm_config():
     data = np.zeros((n_bpms,), dtype=dtypes)
     for i in range(n_bpms):
         entry = bpm_config.bpm_conf[i]
-        data[i] = entry + (0, 0)
+        no_offset = (0, 0)
+        data[i] = entry + no_offset
 
     del entry, i, n_bpms
 
