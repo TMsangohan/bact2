@@ -36,7 +36,7 @@ def closed_orbit_kick(mu,  *, tune, beta_i, theta_i, mu_i):
 
     '''
     cou = closed_orbit_kick_unscaled(mu, tune=tune, mu_i=mu_i)
-    scale = beta_i * theta_i
+    scale = np.sqrt(beta_i) * theta_i
     r = scale * cou
     return r
 
