@@ -12,7 +12,7 @@ logger = logging.getLogger('bact2')
 bpm_scale_factor = 1./1000.
 
 
-def select_bpm_data_in_model(ds, dx, dy):
+def select_bpm_data_in_model(ds, arrays):
     '''
 
     remove the missing bpm at position 165
@@ -23,10 +23,12 @@ def select_bpm_data_in_model(ds, dx, dy):
     bpms_in_model = np.absolute(ds_ref - 165) > 1e-5
 
     ds_m = ds[:, bpms_in_model]
-    dx_m = dx[:, bpms_in_model]
-    dy_m = dy[:, bpms_in_model]
+    
+    r = [a[:, bpms_in_model] for a in arrays]
+    # dx_m = dx[:, bpms_in_model]
+    # dy_m = dy[:, bpms_in_model]
 
-    return ds_m, dx_m, dy_m
+    return ds_m, r
 
 
 class OrbitOffsetProcessor:

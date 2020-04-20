@@ -13,34 +13,46 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger('bact2')
 
 
-def prepare_bpm_data(df_sel, ref_row=0):
+def prepare_bpm_data(df_sel, ref_row=None):
 
-    ref = df_sel.iloc[ref_row, :]
-    x0 = ref.bpm_waveform_x_pos
-    y0 = ref.bpm_waveform_y_pos
 
     x = df_sel.bpm_waveform_x_pos
     y = df_sel.bpm_waveform_y_pos
+    ds = df_sel.bpm_waveform_ds
+
+    x_r = df_sel.bpm_waveform_x_rms
+    y_r = df_sel.bpm_waveform_y_rms
+
+    ds = np.array(ds.tolist(), np.float_)
+    x_r = np.array(x_r.tolist(), np.float_)
+    y_r = np.array(y_r.tolist(), np.float_)
 
     x = np.array(x.tolist(), np.float_)
     y = np.array(y.tolist(), np.float_)
+    
+    if ref_row is not None:
+        ref = df_sel.iloc[ref_row, :]
+        x0 = ref.bpm_waveform_x_pos
+        y0 = ref.bpm_waveform_y_pos
 
-    ds = df_sel.bpm_waveform_ds
+        logger.debug(f'x0.shape {x0.shape}, x.shape {x.shape}')
 
-    logger.warning(f'x0.shape {x0.shape}, x.shape {x.shape}')
-    dx = x - x0
-    dy = y - y0
+        dx = x - x0
+        dy = y - y0
+        
+    else:
+        dx = x
+        dy = y
 
-    dx = np.array(dx.tolist(), np.float_)
-    dy = np.array(dy.tolist(), np.float_)
-    ds = np.array(ds.tolist(), np.float_)
+    ds_m, r = model_fits.select_bpm_data_in_model(ds, [dx, dy, x_r, y_r])
+    dx_m, dy_m, x_r_m, y_r_m = r
+    
+    bpm_data     = reference_orbit.OrbitData(x=dx, y=dy, s=ds)
+    bpm_data_m   = reference_orbit.OrbitData(x=dx_m, y=dy_m, s=ds_m)
+    bpm_data_rms = reference_orbit.OrbitData(x=x_r, y=y_r, s=ds)
+    bpm_data_m_rms = reference_orbit.OrbitData(x=x_r_m, y=y_r_m, s=ds_m)
 
-    ds_m, dx_m, dy_m = model_fits.select_bpm_data_in_model(ds, dx, dy)
-
-    bpm_data = reference_orbit.OrbitData(x=dx, y=dy, s=ds)
-    bpm_data_m = reference_orbit.OrbitData(x=dx_m, y=dy_m, s=ds_m)
-
-    return bpm_data, bpm_data_m
+    return bpm_data, bpm_data_m, bpm_data_rms, bpm_data_m_rms
 
 
 def plot_fit_data_one_coordinate(ref_data=None, bpm_data=None, bpm_data_m=None,
