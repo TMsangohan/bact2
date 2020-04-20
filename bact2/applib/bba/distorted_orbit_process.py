@@ -128,7 +128,8 @@ class MachineResultsXY:
 
 
 def bpm_data_process(data, dI, eps=1e-3):
-
+    '''Calulate offset of distorted orbits to ideal orbit
+    '''
     adI = np.absolute(dI)
     idx = adI < eps
     offset_data = data[idx, :]
